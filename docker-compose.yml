@@ -1,0 +1,23 @@
+version: '3.8'
+services:
+  python_service:
+    build: ./python_service
+    container_name: slider
+    restart: always
+    ports:
+      - "8010:8010"
+    volumes:
+      - ./python_service:/app
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.slider.entrypoints=websecure"
+      - "traefik.http.routers.slider.rule=Host(`slider.sd-ai.co.uk`)"
+      - "traefik.http.routers.slider.tls=true"
+      - "traefik.http.routers.slider.tls.certresolver=letsencrypt"
+      - "traefik.http.services.slider.loadbalancer.server.port=8010"
+
+networks:
+  traefik_network:
+    external: true

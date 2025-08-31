@@ -1,0 +1,145 @@
+{
+  "name": "PowerPoint Slide Generator with AI",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-node",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are an expert PowerPoint presentation designer and content strategist. Your task is to transform basic user input into professional, engaging slide content that follows presentation best practices.\n\nKey responsibilities:\n1. Enhance titles to be concise, impactful, and attention-grabbing\n2. Transform content into clear, scannable bullet points (3-5 per slide max)\n3. Use action-oriented language and professional terminology\n4. Ensure content is presentation-ready (not too wordy)\n5. Maintain the original meaning while improving clarity and impact\n6. Add relevant sub-points or examples when appropriate\n7. Use consistent formatting and structure\n\nAlways return valid JSON with the exact structure requested."
+          },
+          {
+            "role": "user",
+            "content": "Transform the following user-provided slide content into professional PowerPoint slides. Enhance the titles, restructure the content with proper bullet points, and make it presentation-ready:\n\nUSER SLIDES:\n{{ JSON.stringify($json.body.slides, null, 2) }}\n\nINSTRUCTIONS:\n- Keep each slide focused on ONE main idea\n- Use 3-5 bullet points maximum per slide\n- Make titles compelling and concise (under 10 words)\n- Transform paragraphs into scannable bullet points\n- Use active voice and professional language\n- Add relevant examples or key benefits when appropriate\n- Ensure content flows logically\n\nReturn ONLY a valid JSON object with this exact structure:\n{\n  \"slides\": [\n    {\n      \"title\": \"Enhanced Slide Title\",\n      \"content\": \"• Key point one\\n• Key point two\\n• Key point three\\n• Supporting detail or example\"\n    }\n  ]\n}\n\nDo not include any explanatory text outside the JSON structure."
+          }
+        ],
+        "options": {}
+      },
+      "id": "openai-node",
+      "name": "OpenAI",
+      "type": "n8n-nodes-base.openAi",
+      "typeVersion": 1,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "enhanced_slides_json",
+              "value": "={{ JSON.parse($json.choices[0].message.content) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "parse-ai-response-node",
+      "name": "Parse AI Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://slider.sd-ai.co.uk/generate-pptx",
+        "sendBody": true,
+        "bodyContentType": "raw",
+        "specifyBody": "using field below",
+        "body": "={{ JSON.stringify($json.enhanced_slides_json) }}",
+        "options": {
+          "bodyContentCustomMimeType": "application/json"
+        }
+      },
+      "id": "http-request-node",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "download_url",
+              "value": "={{ $json.download_url }}"
+            },
+            {
+              "name": "filename",
+              "value": "={{ $json.filename }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-response-node",
+      "name": "Set Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Set Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "staticData": null
+}
