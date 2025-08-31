@@ -1,16 +1,16 @@
 # 🎯 AI-Powered PowerPoint Slide Generator
 
-An intelligent web application that creates professional PowerPoint presentations using AI content enhancement. Users can input basic slide content through a beautiful web interface, which gets enhanced by GPT-4 and converted into polished PowerPoint presentations.
+An intelligent web application that creates **professional executive presentations** using AI content enhancement. Features dark blue backgrounds with white text for C-level presentations.
 
 ## 🌟 Features
 
-- **🎨 Beautiful Web Interface**: Modern, responsive form for slide creation
-- **🤖 AI Content Enhancement**: GPT-4 powered content improvement
-- **📊 Professional Presentations**: Auto-generated PowerPoint files
+- **🎨 Professional Design**: Dark blue (#1e3a8a) background with white text
+- **🤖 AI Content Enhancement**: GPT-4 powered executive-level content creation
+- **📊 Smart Charts**: Automatic chart generation with business color schemes
 - **🔒 Secure Downloads**: Direct download links for generated files
 - **🐳 Containerized**: Docker deployment with Traefik routing
 - **⚡ FastAPI Backend**: High-performance Python service
-- **🔄 N8N Workflow**: Automated content processing pipeline
+- **🔄 N8N Workflow**: Complete AI automation pipeline
 
 ## 🚀 Quick Start
 
@@ -67,40 +67,53 @@ slider/
 ### Web Interface
 - `GET /` - Main application interface
 - `POST /generate-pptx` - Generate PowerPoint from JSON
+- `POST /ai-generate-pptx` - AI-enhanced PowerPoint generation
+- `POST /test-professional-slide` - Test professional styling
 - `GET /download/{filename}` - Download generated files
+- `GET /health` - Service health check
 
 ### N8N Integration
-- Webhook endpoint processes form submissions
-- AI enhancement via OpenAI GPT-4
-- Automated PowerPoint generation
+- **Webhook URL**: `https://slider-n8n.your-domain.com/webhook/slider`
+- **Method**: POST
+- **Content-Type**: application/json
 
-## 🎨 AI Enhancement Features
+## 🎨 Professional Design System
 
-The system uses advanced AI to transform basic user input into professional presentation content:
-
-- **Smart Titles**: Concise, impactful slide titles
-- **Bullet Points**: 3-5 optimized bullet points per slide
-- **Professional Language**: Business-appropriate terminology
-- **Content Structure**: Logical flow and organization
-- **Presentation Ready**: Optimized for visual impact
+- **Background**: Executive dark blue (#1e3a8a)
+- **Title Text**: White, 32pt, Bold
+- **Headline Text**: White, 24pt, Bold
+- **Content Text**: White, 18pt, Professional
+- **Chart Text**: White, 16pt, Clear
+- **Layout**: Clean, executive-focused design
+- **Color Scheme**: Business-appropriate chart colors
 
 ### Example Transformation
 
 **Input:**
 ```json
 {
-  "title": "Our Services",
-  "content": "We provide good services to customers"
+  "title": "Sales Update",
+  "content": "We did good this month"
 }
 ```
 
 **AI Enhanced Output:**
 ```json
 {
-  "title": "Comprehensive Service Solutions",
-  "content": "• Client-centric service delivery\n• Quality-driven solutions\n• 24/7 customer support\n• Measurable business results"
+  "title": "Executive Sales Performance Report",
+  "headline": "Record-Breaking Monthly Results",
+  "content": "• 150 new customers acquired\n• $500K revenue milestone achieved\n• 40% increase in customer acquisition\n• Team performance exceeded targets",
+  "chartType": "bar",
+  "chartData": {
+    "labels": ["Q1", "Q2", "Q3", "Q4"],
+    "values": [100, 150, 180, 220],
+    "colors": ["#60A5FA", "#3B82F6", "#1D4ED8", "#1E3A8A"],
+    "title": "Quarterly Revenue Performance"
+  }
 }
 ```
+
+**Result**: Professional PowerPoint with dark blue background, white text, and business-appropriate charts.
 
 ## 🐳 Docker Services
 
@@ -128,10 +141,17 @@ The system uses advanced AI to transform basic user input into professional pres
 ## 📊 Workflow Architecture
 
 ```
-User Form → N8N Webhook → AI Enhancement → Python Service → PowerPoint → Download Link
-    ↓           ↓              ↓              ↓              ↓           ↓
-  HTML Form   JSON Data     GPT-4 Processing FastAPI       .pptx      Secure URL
+Webhook Request → N8N AI Agent → Content Enhancement → Python Service → Professional PowerPoint → Response
+     ↓              ↓              ↓                      ↓                      ↓              ↓
+Raw Content     Prompt Analysis   Executive Content    Dark Blue Theme      .pptx File    Download URL
 ```
+
+### AI Workflow Steps:
+1. **Webhook**: Receives user content and requirements
+2. **AI Agent 1**: Analyzes content and creates enhancement prompt
+3. **AI Agent 2**: Generates professional executive content in JSON
+4. **Python Service**: Creates PowerPoint with dark blue background
+5. **Response**: Returns secure download URL
 
 ## 🛠️ Development
 

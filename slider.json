@@ -1,0 +1,203 @@
+{
+  "name": "slider",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "slider",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "55158093-059f-49b7-8c9c-9a886861a3a3",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [
+        320,
+        240
+      ],
+      "webhookId": "81c07d85-5b65-483d-96d9-78a9200bf4d4"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://python_service:8010/ai-generate-pptx",
+        "sendBody": true,
+        "bodyContentType": "json",
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.enhanced_slides }}",
+        "options": {}
+      },
+      "id": "50149944-a7ef-487c-9658-1a49aad7c0ab",
+      "name": "HTTP Request",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        1120,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "123e4433-3e3e-44ba-b139-acf11c604630",
+      "name": "Set Response",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        1344,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "enhanced_slides",
+              "value": "={{ JSON.parse($json.output) }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "baf62d8e-5d3c-4ae9-86d1-ee18a340e1bd",
+      "name": "Parse AI Response1",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [
+        896,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        616,
+        464
+      ],
+      "id": "e44f2b76-41d6-49ca-98cd-f9f3e5fda543",
+      "name": "OpenRouter Chat Model",
+      "credentials": {
+        "openRouterApi": {
+          "id": "79slelHGUEcMOvyp",
+          "name": "OpenRouter account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=\"You are a professional PowerPoint designer specializing in creating compelling business presentations with dark blue backgrounds and white text. Transform the user's slide content into professional, visually appealing slides that work perfectly with a dark blue (#1e3a8a) background and white text.\\n\\nUSER SLIDES:\\n{{ JSON.stringify($json.body.slides, null, 2) }}\\n\\nPROFESSIONAL DESIGN REQUIREMENTS:\\n- Create titles that are impactful and concise (6-10 words max)\\n- Transform headlines into compelling slide headers\\n- Convert content into 3-5 scannable bullet points per slide\\n- Use professional business language and active voice\\n- Focus on ONE main idea per slide\\n- Add relevant examples or key benefits when appropriate\\n- Ensure content flows logically and professionally\\n\\nCHART OPTIMIZATION:\\n- For data slides: Analyze data and recommend optimal chart types\\n- Provide complete chart specifications with proper data structure\\n- Include color schemes that work with dark blue backgrounds\\n- Add trend analysis and insights for line/bar charts\\n- Ensure chart data is presentation-ready\\n\\nPROFESSIONAL FORMATTING:\\n- Use bullet points for easy scanning\\n- Keep text concise and impactful\\n- Focus on business value and outcomes\\n- Add professional sub-points when needed\\n- Ensure content is suitable for executive presentations\\n\\nReturn ONLY valid JSON with this exact structure:\\n{\\n  \\\"slides\\\": [\\n    {\\n      \\\"title\\\": \\\"Professional Slide Title\\\",\\n      \\\"headline\\\": \\\"Compelling Slide Header\\\",\\n      \\\"content\\\": \\\"• Key business point\\\\n• Supporting data or benefit\\\\n• Actionable insight\\\\n• Professional conclusion\\\",\\n      \\\"chartType\\\": \\\"bar|pie|line|column|area|doughnut\\\" (optional),\\n      \\\"chartData\\\": {\\n        \\\"labels\\\": [\\\"Q1\\\", \\\"Q2\\\", \\\"Q3\\\"],\\n        \\\"values\\\": [100, 150, 200],\\n        \\\"colors\\\": [\\\"#60A5FA\\\", \\\"#3B82F6\\\", \\\"#1D4ED8\\\"],\\n        \\\"title\\\": \\\"Professional Chart Title\\\"\\n      } (optional)\\n    }\\n  ]\\n}\\n\\nDo not include any explanatory text outside the JSON structure.\"",
+        "hasOutputParser": true,
+          "systemMessage": "You are a senior PowerPoint presentation designer specializing in executive-level business presentations with professional dark blue backgrounds and white text. Your expertise includes:\\n\\n1. **Content Strategy**: Transform raw content into compelling business narratives\\n2. **Visual Design**: Create content that works perfectly with dark blue (#1e3a8a) backgrounds\\n3. **Executive Communication**: Use professional language suitable for C-level presentations\\n4. **Data Visualization**: Recommend optimal chart types and provide complete specifications\\n5. **Slide Architecture**: Structure content for maximum impact and clarity\\n\\n**Key Principles**:\\n- Focus on ONE main business idea per slide\\n- Use 3-5 bullet points maximum for scannability\\n- Create titles that grab attention and convey value\\n- Transform content into actionable business insights\\n- Ensure all text is readable on dark backgrounds\\n- Add professional context and business value\\n- Use executive-level language and terminology\\n\\n**Chart Expertise**:\\n- Analyze data patterns and recommend optimal visualizations\\n- Provide complete chart specifications with proper data structure\\n- Use color schemes that complement dark blue backgrounds\\n- Include trend analysis and key insights\\n- Ensure charts tell a clear business story\\n\\nAlways return valid JSON with the exact structure requested."
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        544,
+        240
+      ],
+      "id": "f5711deb-150d-47db-a6a5-d224055b061b",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [
+        1696,
+        256
+      ],
+      "id": "be1506ce-7065-4f2a-b4e5-1e01c7b013ef",
+      "name": "Respond to Webhook"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Set Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse AI Response1": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse AI Response1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "aedc9825-17f3-4a49-ac45-8d7cffc28cc7",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "617357906116277d086141902ffb18d0c47ff069146ca500ddf5150f1c8a80a4"
+  },
+  "id": "C9BwIu28iLJ5Ah2x",
+  "tags": []
+}
