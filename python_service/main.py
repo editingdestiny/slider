@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 import uvicorn
 import json
 import tempfile
@@ -9,10 +10,22 @@ import os
 import logging
 import shutil
 import time
+import httpx
+from pathlib import Path
+from dotenv import load_dotenv
 from pptx_generator import create_pptx_from_json
+
+# Load environment variables
+load_dotenv()
 
 # Configuration
 DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "https://slider.sd-ai.co.uk")
+N8N_WEBHOOK_URL = "https://sd-n8n.duckdns.org/webhook-test/slider"
+
+# Pydantic models for request validation
+class SlideGenerationRequest(BaseModel):
+    search_phrase: str
+    number_of_slides: int = 5  # Default to 5 slides
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -197,48 +210,239 @@ async def startup_event():
     cleanup_old_files()
     logger.info("Application started and old files cleaned up")
 
-@app.post("/test-professional-slide")
-async def test_professional_slide():
-    """Generate a test slide with professional styling"""
-    test_data = {
-        "slides": [
-            {
-                "title": "Professional Business Presentation",
-                "headline": "Executive Summary",
-                "content": "• Strategic business objectives achieved\n• Revenue growth of 25% YoY\n• Market leadership maintained\n• Innovation pipeline strengthened",
-                "chartType": "bar",
-                "chartData": {
-                    "labels": ["Q1", "Q2", "Q3", "Q4"],
-                    "values": [120, 150, 180, 200],
-                    "colors": ["#60A5FA", "#3B82F6", "#1D4ED8", "#1E3A8A"],
-                    "title": "Quarterly Revenue Growth"
-                }
-            }
-        ]
-    }
-
+@app.post("/generate-slides-from-search")
+async def generate_slides_from_search(request: SlideGenerationRequest):
+    """Generate PowerPoint slides by triggering n8n webhook and return the file"""
     try:
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-            success = create_pptx_from_json(test_data, tmp.name)
-            if not success:
-                return {"error": "Failed to create test presentation", "status": "error"}
-
-            # Store file in a more persistent location
-            persistent_path = f"/tmp/test_pptx_{tmp.name.split('/')[-1]}"
-            shutil.move(tmp.name, persistent_path)
-
-            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-
-            return {
-                "download_url": download_url,
-                "filename": "professional_test.pptx",
-                "status": "success",
-                "message": "Professional slide generated with dark blue background and white text"
-            }
+        logger.info(f"Triggering n8n webhook for: {request.search_phrase}, {request.number_of_slides} slides")
+        
+        # Prepare payload for n8n webhook
+        webhook_payload = {
+            "search_phrase": request.search_phrase,
+            "number_of_slides": request.number_of_slides,
+            "timestamp": time.time()
+        }
+        
+        # Trigger n8n webhook and expect binary file response
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(N8N_WEBHOOK_URL, json=webhook_payload)
+                response.raise_for_status()
+                
+                # Check if response is binary (PowerPoint file)
+                content_type = response.headers.get('content-type', '')
+                if 'application/vnd.openxmlformats-officedocument.presentationml.presentation' in content_type:
+                    # Return the PowerPoint file directly
+                    logger.info(f"Received PowerPoint file from n8n webhook, returning file")
+                    filename = f"{request.search_phrase.replace(' ', '_')}_Analysis.pptx"
+                    
+                    # Save temporarily to return as FileResponse
+                    with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+                        tmp.write(response.content)
+                        
+                        return FileResponse(
+                            path=tmp.name,
+                            filename=filename,
+                            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        )
+                else:
+                    # Handle JSON response (fallback)
+                    webhook_result = response.json()
+                    logger.info(f"n8n webhook returned JSON: {webhook_result}")
+                    
+                    return {
+                        "status": "success",
+                        "message": f"Request submitted to n8n for processing: {request.search_phrase}",
+                        "webhook_response": webhook_result,
+                        "search_phrase": request.search_phrase,
+                        "number_of_slides": request.number_of_slides
+                    }
+                    
+            except httpx.HTTPError as e:
+                logger.error(f"Error calling n8n webhook: {e}")
+                return {"error": f"Failed to trigger n8n webhook: {str(e)}", "status": "error"}
 
     except Exception as e:
-        logger.error(f"Error generating test slide: {str(e)}")
-        return {"error": f"Failed to generate test: {str(e)}", "status": "error"}
+        logger.error(f"Error in slide generation: {str(e)}")
+        return {"error": f"Failed to generate presentation: {str(e)}", "status": "error"}
+
+@app.post("/create-presentation")
+async def create_presentation(content_data: dict):
+    """Direct endpoint for n8n to create presentations with AI content"""
+    try:
+        search_phrase = content_data.get("search_phrase", "Analysis")
+        return_file = content_data.get("return_file", False)  # New parameter to return file directly
+        logger.info(f"Creating presentation for: {search_phrase}, return_file: {return_file}")
+        
+        # Handle data field if nested
+        data = content_data.get("data", content_data)
+        
+        # Handle field name variations (dataSources vs sources)
+        if "dataSources" in data and "sources" not in data:
+            data["sources"] = data["dataSources"]
+            del data["dataSources"]
+        
+        # Determine content type and process accordingly
+        if "executiveSummary" in data:
+            # ESG data - use ESG_Presentation class
+            logger.info("Creating ESG presentation")
+            from slider import ESG_Presentation
+            
+            presentation = ESG_Presentation(data)
+            
+            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+                # Add ESG slides
+                presentation.add_title_slide(
+                    f"ESG Analysis: {search_phrase}", 
+                    f"Comprehensive ESG Assessment"
+                )
+                presentation.add_slide1_summary()
+                presentation.add_paginated_impact_slide()
+                presentation.add_paginated_regional_trends()
+                presentation.add_sentiment_justification_slides()
+                presentation.add_paginated_sources()
+                
+                presentation.prs.save(tmp.name)
+                
+                # Return file directly if requested
+                if return_file:
+                    filename = f"ESG_Analysis_{search_phrase.replace(' ', '_')}.pptx"
+                    logger.info(f"Returning ESG presentation file directly: {filename}")
+                    return FileResponse(
+                        path=tmp.name,
+                        filename=filename,
+                        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+                
+                # Store file persistently for download URL
+                persistent_path = f"/tmp/esg_pptx_{tmp.name.split('/')[-1]}"
+                shutil.move(tmp.name, persistent_path)
+                
+                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+                logger.info(f"Generated ESG presentation: {download_url}")
+                
+                return {
+                    "download_url": download_url,
+                    "filename": f"ESG_Analysis_{search_phrase.replace(' ', '_')}.pptx",
+                    "status": "success",
+                    "presentation_type": "ESG",
+                    "slides_generated": len(presentation.prs.slides),
+                    "search_phrase": search_phrase
+                }
+                
+        elif "slides" in data:
+            # Simple slides data - use pptx_generator
+            logger.info("Creating general slides presentation")
+            
+            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+                success = create_pptx_from_json(data, tmp.name)
+                if not success:
+                    return {"error": "Failed to create PowerPoint presentation", "status": "error"}
+                
+                # Return file directly if requested
+                if return_file:
+                    filename = f"{search_phrase.replace(' ', '_')}_Presentation.pptx"
+                    logger.info(f"Returning general presentation file directly: {filename}")
+                    return FileResponse(
+                        path=tmp.name,
+                        filename=filename,
+                        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                    )
+                
+                # Store file persistently for download URL
+                persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
+                shutil.move(tmp.name, persistent_path)
+                
+                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+                logger.info(f"Generated slides presentation: {download_url}")
+                
+                return {
+                    "download_url": download_url,
+                    "filename": f"{search_phrase.replace(' ', '_')}_Presentation.pptx",
+                    "status": "success",
+                    "presentation_type": "General",
+                    "slides_generated": len(content_data["slides"]),
+                    "search_phrase": search_phrase
+                }
+        else:
+            return {"error": "Invalid content format - missing 'slides' or 'executiveSummary'", "status": "error"}
+            
+    except Exception as e:
+        logger.error(f"Error creating presentation: {str(e)}")
+        return {"error": f"Failed to create presentation: {str(e)}", "status": "error"}
+
+@app.post("/process-ai-content")
+async def process_ai_content(ai_data: dict):
+    """Process AI-generated content and create presentation"""
+    try:
+        logger.info(f"Processing AI-generated content: {type(ai_data)}")
+        
+        # Determine content type and process accordingly
+        if "executiveSummary" in ai_data:
+            # ESG data - use ESG_Presentation class
+            logger.info("Processing ESG content with ESG_Presentation")
+            from slider import ESG_Presentation
+            
+            presentation = ESG_Presentation(ai_data)
+            
+            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+                # Add ESG slides
+                presentation.add_title_slide(
+                    f"ESG Analysis: {ai_data.get('search_phrase', 'Analysis')}", 
+                    f"Comprehensive ESG Assessment"
+                )
+                presentation.add_slide1_summary()
+                presentation.add_paginated_impact_slide()
+                presentation.add_paginated_regional_trends()
+                presentation.add_sentiment_justification_slides()
+                presentation.add_paginated_sources()
+                
+                presentation.prs.save(tmp.name)
+                
+                # Store file persistently
+                persistent_path = f"/tmp/esg_pptx_{tmp.name.split('/')[-1]}"
+                shutil.move(tmp.name, persistent_path)
+                
+                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+                logger.info(f"Generated ESG presentation: {download_url}")
+                
+                return {
+                    "download_url": download_url,
+                    "filename": f"ESG_Analysis.pptx",
+                    "status": "success",
+                    "presentation_type": "ESG",
+                    "slides_generated": len(presentation.prs.slides)
+                }
+                
+        elif "slides" in ai_data:
+            # Simple slides data - use pptx_generator
+            logger.info("Processing general slides content with pptx_generator")
+            
+            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+                success = create_pptx_from_json(ai_data, tmp.name)
+                if not success:
+                    return {"error": "Failed to create PowerPoint presentation", "status": "error"}
+                
+                # Store file persistently
+                persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
+                shutil.move(tmp.name, persistent_path)
+                
+                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+                logger.info(f"Generated slides presentation: {download_url}")
+                
+                return {
+                    "download_url": download_url,
+                    "filename": f"Presentation.pptx",
+                    "status": "success",
+                    "presentation_type": "General",
+                    "slides_generated": len(ai_data["slides"])
+                }
+        else:
+            return {"error": "Invalid AI content format", "status": "error"}
+            
+    except Exception as e:
+        logger.error(f"Error processing AI content: {str(e)}")
+        return {"error": f"Failed to process AI content: {str(e)}", "status": "error"}
 
 @app.get("/cleanup")
 async def manual_cleanup():

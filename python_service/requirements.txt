@@ -3,3 +3,8 @@ uvicorn
 python-pptx
 python-multipart
 requests
+httpx
+numpy
+matplotlib
+pydantic
+python-dotenv
