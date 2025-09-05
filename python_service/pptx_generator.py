@@ -1,9 +1,14 @@
 from pptx import Presentation
-from pptx.util import Pt
+from pptx.util import Pt, Inches
 from pptx.dml.color import RGBColor
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR, MSO_AUTO_SIZE
+import numpy as np
 from typing import Dict
 import json
 import logging
+import io
+import math
 
 logger = logging.getLogger(__name__)
 

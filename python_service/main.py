@@ -12,7 +12,7 @@ import time
 from pptx_generator import create_pptx_from_json
 
 # Configuration
-DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "http://localhost:8010")
+DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "https://slider.sd-ai.co.uk")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
