@@ -13,7 +13,25 @@ import time
 import httpx
 from pathlib import Path
 from dotenv import load_dotenv
+from pptx import Presentation
+import io
 from general_presentation import create_general_presentation  # Main generator with charts
+
+def is_valid_pptx(file_content: bytes) -> bool:
+    """Validate if the byte content is a valid PPTX file."""
+    if not file_content:
+        logger.error("Validation failed: File content is empty.")
+        return False
+    try:
+        # Use BytesIO to treat the byte content as a file
+        file_stream = io.BytesIO(file_content)
+        # Try to open the presentation. If it fails, it's corrupted.
+        Presentation(file_stream)
+        logger.info("PPTX validation successful.")
+        return True
+    except Exception as e:
+        logger.error(f"Validation failed: The file is not a valid PPTX package or is corrupted: {e}")
+        return False
 
 def create_presentation_with_real_charts(data, output_path):
     """
@@ -198,6 +216,16 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
                 if 'application/vnd.openxmlformats-officedocument.presentationml.presentation' in content_type:
                     # Return the PowerPoint file directly
                     logger.info(f"[{request_id}] Received PowerPoint file from n8n webhook, returning file")
+                    
+                    # --- VALIDATION STEP ---
+                    if not is_valid_pptx(response.content):
+                        logger.error(f"[{request_id}] Validation failed: Received corrupted file from n8n.")
+                        return {
+                            "error": "Received a corrupted presentation file from the generation service. Please try again.",
+                            "status": "error"
+                        }
+                    # --- END VALIDATION ---
+
                     filename = f"{request.search_phrase.replace(' ', '_')}_Analysis.pptx"
                     
                     # Save temporarily to return as FileResponse
@@ -336,6 +364,18 @@ async def create_presentation(content_data: dict):
             presentation = create_general_presentation(data, search_phrase)
             if presentation:
                 presentation.save(tmp.name)
+                
+                # --- VALIDATION STEP ---
+                with open(tmp.name, "rb") as f:
+                    file_content = f.read()
+                if not is_valid_pptx(file_content):
+                    logger.error("Validation failed: Generated a corrupted file locally.")
+                    return {
+                        "error": "The server generated a corrupted presentation file. Please check the logs.",
+                        "status": "error"
+                    }
+                # --- END VALIDATION ---
+                
                 success = True
             else:
                 logger.error("Failed to generate presentation with general_presentation")

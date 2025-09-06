@@ -33,14 +33,17 @@ async function handleQuickGeneration(e) {
         "Generating slides...",
         "Creating charts and tables...",
         "This can take a few minutes...",
-        "Almost there..."
+        "Almost there...",
+        "Finalizing your presentation...",
+        "Preparing your download...",
+
     ];
     let messageIndex = 0;
     loadingMessage.textContent = messages[messageIndex];
     const messageInterval = setInterval(() => {
         messageIndex = (messageIndex + 1) % messages.length;
         loadingMessage.textContent = messages[messageIndex];
-    }, 5000); // Change message every 5 seconds
+    }, 10000); // Change message every 10 seconds
 
     try {
         const response = await fetch('/generate-slides-from-search', {

@@ -29,7 +29,7 @@ TABLE_HEADER_BG_COLOR = RGBColor(0x44, 0x54, 0x6A)
 TABLE_HEADER_FONT_COLOR = RGBColor(0xFF, 0xFF, 0xFF)
 ROW_COLOR_DARK = RGBColor(0x2A, 0x39, 0x50)
 BRAND_COLORS = ['#007ACC', '#09534F', '#4CAF50', '#FF9800', '#F44336', '#9C27B0']
-HYPERLINK_COLOR = RGBColor(0x9B, 0xC1, 0xE4)
+HYPERLINK_COLOR = RGBColor(0xFF, 0xFF, 0xFF)
 
 # --- Helper Functions ---
 def set_title_style(title_shape, presentation_width):
@@ -403,6 +403,15 @@ def create_general_presentation(data, search_phrase="Business Analysis"):
         # Add summary slide
         if len(slides) > 1:
             presentation.add_summary_slide()
+
+        # Force all text to be white
+        for slide in presentation.prs.slides:
+            for shape in slide.shapes:
+                if not shape.has_text_frame:
+                    continue
+                for paragraph in shape.text_frame.paragraphs:
+                    for run in paragraph.runs:
+                        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
         
         return presentation.prs
         
