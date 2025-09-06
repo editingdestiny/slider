@@ -14,13 +14,14 @@ import httpx
 from pathlib import Path
 from dotenv import load_dotenv
 from pptx_generator import create_pptx_from_json
+from general_presentation import create_general_presentation
 
 # Load environment variables
 load_dotenv()
 
 # Configuration
 DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "https://slider.sd-ai.co.uk")
-N8N_WEBHOOK_URL = "https://sd-n8n.duckdns.org/webhook-test/slider"
+N8N_WEBHOOK_URL = "https://sd-n8n.duckdns.org/webhook/slider"
 
 # Pydantic models for request validation
 class SlideGenerationRequest(BaseModel):
@@ -268,104 +269,145 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
 
 @app.post("/create-presentation")
 async def create_presentation(content_data: dict):
-    """Direct endpoint for n8n to create presentations with AI content"""
+    """Direct endpoint for n8n to create general business presentations"""
     try:
         search_phrase = content_data.get("search_phrase", "Analysis")
-        return_file = content_data.get("return_file", False)  # New parameter to return file directly
-        logger.info(f"Creating presentation for: {search_phrase}, return_file: {return_file}")
+        return_file = content_data.get("return_file", False)
+        logger.info(f"Creating general presentation for: {search_phrase}, return_file: {return_file}")
         
         # Handle data field if nested
         data = content_data.get("data", content_data)
         
-        # Handle field name variations (dataSources vs sources)
-        if "dataSources" in data and "sources" not in data:
-            data["sources"] = data["dataSources"]
-            del data["dataSources"]
+        # Check if data has slides directly or if we need to convert from old format
+        if "slides" not in data:
+            logger.warning(f"No 'slides' key found in data. Available keys: {list(data.keys())}")
+            
+            # Try to convert old ESG format to general slides
+            if "executiveSummary" in data:
+                logger.info("Converting old ESG format to general slides")
+                slides = []
+                
+                # Executive Summary slide
+                exec_summary = data.get("executiveSummary", {})
+                if isinstance(exec_summary, dict):
+                    key_finding = exec_summary.get('keyFinding', 'Key business findings and insights')
+                else:
+                    key_finding = str(exec_summary) if exec_summary else 'Key business findings and insights'
+                
+                slides.append({
+                    "title": f"Executive Summary: {search_phrase}",
+                    "headline": "Key Business Overview",
+                    "content": f"• {key_finding}\n• Market opportunities and strategic implications\n• Risk assessment and mitigation strategies\n• Recommended next steps for implementation"
+                })
+                
+                # Impact Analysis slide
+                if "impactAnalysis" in data:
+                    impact = data["impactAnalysis"]
+                    if isinstance(impact, dict):
+                        financial = impact.get('financial', 'Positive ROI expected')
+                    else:
+                        financial = 'Positive ROI expected'
+                    
+                    slides.append({
+                        "title": "Impact Analysis",
+                        "headline": "Business Impact Assessment",
+                        "content": f"• Financial impact: {financial}\n• Operational efficiency improvements\n• Strategic positioning advantages\n• Long-term business sustainability"
+                    })
+                
+                # Regional/Market Data slide
+                if "regionalData" in data and data["regionalData"]:
+                    regional_data = data["regionalData"]
+                    if isinstance(regional_data, list) and regional_data:
+                        regional = regional_data[0] if isinstance(regional_data[0], dict) else {}
+                    elif isinstance(regional_data, dict):
+                        regional = regional_data
+                    else:
+                        regional = {}
+                    
+                    region = regional.get('region', 'Global market') if isinstance(regional, dict) else 'Global market'
+                    trend = regional.get('trend', 'Positive growth trajectory') if isinstance(regional, dict) else 'Positive growth trajectory'
+                    
+                    slides.append({
+                        "title": "Market Analysis",
+                        "headline": "Regional and Market Insights",
+                        "content": f"• Region: {region}\n• Growth trends: {trend}\n• Market drivers and opportunities\n• Competitive landscape assessment"
+                    })
+                
+                data = {"slides": slides}
+            else:
+                # Create a meaningful slide from available data
+                available_keys = [k for k in data.keys() if k not in ['search_phrase', 'number_of_slides', 'timestamp']]
+                content_points = []
+                
+                for key in available_keys[:4]:  # Take up to 4 keys
+                    value = data.get(key, "")
+                    if isinstance(value, (str, int, float)) and str(value).strip():
+                        content_points.append(f"• {key.replace('_', ' ').title()}: {str(value)[:100]}")
+                    elif isinstance(value, dict) and value:
+                        content_points.append(f"• {key.replace('_', ' ').title()}: Analysis available")
+                    elif isinstance(value, list) and value:
+                        content_points.append(f"• {key.replace('_', ' ').title()}: {len(value)} items identified")
+                
+                if not content_points:
+                    content_points = [
+                        f"• Comprehensive analysis of {search_phrase}",
+                        "• Strategic business opportunities identified",
+                        "• Risk assessment and mitigation strategies",
+                        "• Implementation roadmap and recommendations"
+                    ]
+                
+                data = {
+                    "slides": [
+                        {
+                            "title": f"Business Analysis: {search_phrase}",
+                            "headline": "Comprehensive Business Intelligence",
+                            "content": "\n".join(content_points)
+                        }
+                    ]
+                }
         
-        # Determine content type and process accordingly
-        if "executiveSummary" in data:
-            # ESG data - use ESG_Presentation class
-            logger.info("Creating ESG presentation")
-            from slider import ESG_Presentation
-            
-            presentation = ESG_Presentation(data)
-            
-            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-                # Add ESG slides
-                presentation.add_title_slide(
-                    f"ESG Analysis: {search_phrase}", 
-                    f"Comprehensive ESG Assessment"
-                )
-                presentation.add_slide1_summary()
-                presentation.add_paginated_impact_slide()
-                presentation.add_paginated_regional_trends()
-                presentation.add_sentiment_justification_slides()
-                presentation.add_paginated_sources()
-                
-                presentation.prs.save(tmp.name)
-                
-                # Return file directly if requested
-                if return_file:
-                    filename = f"ESG_Analysis_{search_phrase.replace(' ', '_')}.pptx"
-                    logger.info(f"Returning ESG presentation file directly: {filename}")
-                    return FileResponse(
-                        path=tmp.name,
-                        filename=filename,
-                        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    )
-                
-                # Store file persistently for download URL
-                persistent_path = f"/tmp/esg_pptx_{tmp.name.split('/')[-1]}"
-                shutil.move(tmp.name, persistent_path)
-                
-                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-                logger.info(f"Generated ESG presentation: {download_url}")
-                
-                return {
-                    "download_url": download_url,
-                    "filename": f"ESG_Analysis_{search_phrase.replace(' ', '_')}.pptx",
-                    "status": "success",
-                    "presentation_type": "ESG",
-                    "slides_generated": len(presentation.prs.slides),
-                    "search_phrase": search_phrase
-                }
-                
-        elif "slides" in data:
-            # Simple slides data - use pptx_generator
-            logger.info("Creating general slides presentation")
-            
-            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+        # Always create general slides presentation using rich visuals
+        logger.info("Creating general slides presentation with charts and tables")
+        
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+            # Try to use the new rich presentation generator first
+            presentation = create_general_presentation(data, search_phrase)
+            if presentation:
+                presentation.save(tmp.name)
+                success = True
+            else:
+                # Fallback to basic generator if rich generator fails
+                logger.warning("Rich presentation failed, falling back to basic generator")
                 success = create_pptx_from_json(data, tmp.name)
-                if not success:
-                    return {"error": "Failed to create PowerPoint presentation", "status": "error"}
-                
-                # Return file directly if requested
-                if return_file:
-                    filename = f"{search_phrase.replace(' ', '_')}_Presentation.pptx"
-                    logger.info(f"Returning general presentation file directly: {filename}")
-                    return FileResponse(
-                        path=tmp.name,
-                        filename=filename,
-                        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                    )
-                
-                # Store file persistently for download URL
-                persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
-                shutil.move(tmp.name, persistent_path)
-                
-                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-                logger.info(f"Generated slides presentation: {download_url}")
-                
-                return {
-                    "download_url": download_url,
-                    "filename": f"{search_phrase.replace(' ', '_')}_Presentation.pptx",
-                    "status": "success",
-                    "presentation_type": "General",
-                    "slides_generated": len(content_data["slides"]),
-                    "search_phrase": search_phrase
-                }
-        else:
-            return {"error": "Invalid content format - missing 'slides' or 'executiveSummary'", "status": "error"}
+            
+            if not success:
+                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
+            
+            # Return file directly if requested
+            if return_file:
+                filename = f"{search_phrase.replace(' ', '_')}_Presentation.pptx"
+                logger.info(f"Returning presentation file directly: {filename}")
+                return FileResponse(
+                    path=tmp.name,
+                    filename=filename,
+                    media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                )
+            
+            # Store file persistently for download URL
+            persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
+            shutil.move(tmp.name, persistent_path)
+            
+            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+            logger.info(f"Generated presentation: {download_url}")
+            
+            return {
+                "download_url": download_url,
+                "filename": f"{search_phrase.replace(' ', '_')}_Presentation.pptx",
+                "status": "success",
+                "presentation_type": "General",
+                "slides_generated": len(data.get("slides", [])),
+                "search_phrase": search_phrase
+            }
             
     except Exception as e:
         logger.error(f"Error creating presentation: {str(e)}")
@@ -373,72 +415,41 @@ async def create_presentation(content_data: dict):
 
 @app.post("/process-ai-content")
 async def process_ai_content(ai_data: dict):
-    """Process AI-generated content and create presentation"""
+    """Process AI-generated content and create general business presentation"""
     try:
         logger.info(f"Processing AI-generated content: {type(ai_data)}")
         
-        # Determine content type and process accordingly
-        if "executiveSummary" in ai_data:
-            # ESG data - use ESG_Presentation class
-            logger.info("Processing ESG content with ESG_Presentation")
-            from slider import ESG_Presentation
-            
-            presentation = ESG_Presentation(ai_data)
-            
-            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-                # Add ESG slides
-                presentation.add_title_slide(
-                    f"ESG Analysis: {ai_data.get('search_phrase', 'Analysis')}", 
-                    f"Comprehensive ESG Assessment"
-                )
-                presentation.add_slide1_summary()
-                presentation.add_paginated_impact_slide()
-                presentation.add_paginated_regional_trends()
-                presentation.add_sentiment_justification_slides()
-                presentation.add_paginated_sources()
-                
-                presentation.prs.save(tmp.name)
-                
-                # Store file persistently
-                persistent_path = f"/tmp/esg_pptx_{tmp.name.split('/')[-1]}"
-                shutil.move(tmp.name, persistent_path)
-                
-                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-                logger.info(f"Generated ESG presentation: {download_url}")
-                
-                return {
-                    "download_url": download_url,
-                    "filename": f"ESG_Analysis.pptx",
-                    "status": "success",
-                    "presentation_type": "ESG",
-                    "slides_generated": len(presentation.prs.slides)
-                }
-                
-        elif "slides" in ai_data:
-            # Simple slides data - use pptx_generator
-            logger.info("Processing general slides content with pptx_generator")
-            
-            with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+        # Always process as general slides with rich visuals
+        logger.info("Processing general slides content with rich presentation generator")
+        
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+            # Try to use the new rich presentation generator first
+            presentation = create_general_presentation(ai_data, ai_data.get('search_phrase', 'Analysis'))
+            if presentation:
+                presentation.save(tmp.name)
+                success = True
+            else:
+                # Fallback to basic generator if rich generator fails
+                logger.warning("Rich presentation failed, falling back to basic generator")
                 success = create_pptx_from_json(ai_data, tmp.name)
-                if not success:
-                    return {"error": "Failed to create PowerPoint presentation", "status": "error"}
-                
-                # Store file persistently
-                persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
-                shutil.move(tmp.name, persistent_path)
-                
-                download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-                logger.info(f"Generated slides presentation: {download_url}")
-                
-                return {
-                    "download_url": download_url,
-                    "filename": f"Presentation.pptx",
-                    "status": "success",
-                    "presentation_type": "General",
-                    "slides_generated": len(ai_data["slides"])
-                }
-        else:
-            return {"error": "Invalid AI content format", "status": "error"}
+            
+            if not success:
+                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
+            
+            # Store file persistently
+            persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
+            shutil.move(tmp.name, persistent_path)
+            
+            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
+            logger.info(f"Generated general presentation: {download_url}")
+            
+            return {
+                "download_url": download_url,
+                "filename": f"Presentation.pptx",
+                "status": "success",
+                "presentation_type": "General",
+                "slides_generated": len(ai_data.get("slides", []))
+            }
             
     except Exception as e:
         logger.error(f"Error processing AI content: {str(e)}")

@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PowerPoint Slide Generator</title>
+    <link rel="stylesheet" href="/static/styles.css">
+    <style>
+        .quick-generation-section {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .quick-generation-section h2 {
+            margin-top: 0;
+            color: white;
+        }
+        
+        .quick-form {
+            background: rgba(255,255,255,0.1);
+            padding: 25px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .form-row {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .form-row .form-group {
+            flex: 1;
+            min-width: 250px;
+        }
+        
+        .quick-form label {
+            color: white;
+            font-weight: 600;
+            margin-bottom: 8px;
+            display: block;
+        }
+        
+        .quick-form input,
+        .quick-form select {
+            background: rgba(255,255,255,0.9);
+            border: 2px solid transparent;
+            padding: 12px 15px;
+            border-radius: 8px;
+            font-size: 16px;
+            width: 100%;
+            box-sizing: border-box;
+            transition: all 0.3s ease;
+        }
+        
+        .quick-form input:focus,
+        .quick-form select:focus {
+            outline: none;
+            border-color: #fff;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(255,255,255,0.3);
+        }
+        
+        .generate-btn {
+            background: linear-gradient(135deg, #ff6b6b, #ffa500);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: 600;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(255,107,107,0.4);
+            margin-top: 20px;
+            width: 100%;
+        }
+        
+        .generate-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 7px 20px rgba(255,107,107,0.6);
+        }
+        
+        .advanced-section {
+            text-align: center;
+            margin: 40px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        
+        .toggle-advanced {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .toggle-advanced:hover {
+            background: #5a6268;
+            transform: translateY(-1px);
+        }
+        
+        .advanced-form {
+            margin-top: 30px;
+            padding: 20px;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 PowerPoint Slide Generator</h1>
+        <p style="text-align: center; color: #666; margin-bottom: 30px;">
+            Create professional PowerPoint presentations with AI assistance
+        </p>
+
+        <!-- Quick Generation Section -->
+        <div class="quick-generation-section">
+            <h2>🚀 Quick Generation</h2>
+            <p style="color: rgba(255,255,255,0.9); margin-bottom: 20px;">
+                Generate presentations instantly by entering a topic and number of slides
+            </p>
+
+            <form id="quickForm" class="quick-form">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="searchPhrase">Topic/Search Phrase:</label>
+                        <input type="text" id="searchPhrase" name="searchPhrase" 
+                               placeholder="e.g. Digital Transformation, Climate Change, AI Technology..." 
+                               required>
+                    </div>
+                    <div class="form-group">
+                        <label for="numberOfSlides">Number of Slides:</label>
+                        <select id="numberOfSlides" name="numberOfSlides">
+                            <option value="3">3 slides</option>
+                            <option value="5" selected>5 slides</option>
+                            <option value="8">8 slides</option>
+                            <option value="10">10 slides</option>
+                            <option value="12">12 slides</option>
+                            <option value="15">15 slides</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="presentationType">Presentation Type:</label>
+                        <select id="presentationType" name="presentationType">
+                            <option value="general">General Presentation</option>
+                            <option value="esg">ESG Analysis</option>
+                        </select>
+                    </div>
+                </div>
+                <button type="submit" class="generate-btn">🚀 Generate Presentation</button>
+            </form>
+        </div>
+
+        <!-- Advanced/Manual Section -->
+        <div class="advanced-section">
+            <h2>⚙️ Advanced Manual Creation</h2>
+            <p style="color: #666; margin-bottom: 20px;">
+                Create custom presentations by defining each slide manually
+            </p>
+            <button type="button" class="toggle-advanced" onclick="toggleAdvancedForm()">
+                Show Advanced Options
+            </button>
+            
+            <div id="advancedFormContainer" style="display: none;" class="advanced-form">
+                <form id="slideForm">
+                    <div id="slidesContainer">
+                        <div class="slide-input" data-slide="1">
+                            <div class="slide-header">
+                                <span class="slide-number">Slide 1</span>
+                                <button type="button" class="remove-slide" onclick="removeSlide(1)" style="display: none;">Remove</button>
+                            </div>
+                            <div class="form-group">
+                                <label for="title1">Slide Title:</label>
+                                <input type="text" id="title1" name="title1" placeholder="Enter slide title..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="headline1">Slide Headline:</label>
+                                <input type="text" id="headline1" name="headline1" placeholder="Enter slide headline..." required>
+                            </div>
+                            <div class="form-group">
+                                <label for="content1">Slide Content/Data:</label>
+                                <textarea id="content1" name="content1" placeholder="Enter slide content or data points..." required></textarea>
+                            </div>
+                            <div class="form-group">
+                                <label for="backgroundColor1">Background Color:</label>
+                                <select id="backgroundColor1" name="backgroundColor1">
+                                    <option value="#FFFFFF">White</option>
+                                    <option value="#F8F9FA">Light Gray</option>
+                                    <option value="#1565C0">Corporate Blue</option>
+                                    <option value="#2E7D32">Professional Green</option>
+                                    <option value="#6D4C41">Executive Brown</option>
+                                    <option value="#424242">Business Gray</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="chartType1">Chart Type (Optional):</label>
+                                <select id="chartType1" name="chartType1" onchange="toggleChartData(1)">
+                                    <option value="">No Chart</option>
+                                    <option value="bar">Bar Chart</option>
+                                    <option value="pie">Pie Chart</option>
+                                    <option value="line">Line Chart</option>
+                                    <option value="column">Column Chart</option>
+                                </select>
+                            </div>
+                            <div class="form-group chart-data" id="chartData1" style="display: none;">
+                                <label for="chartDataInput1">Chart Data (JSON format):</label>
+                                <textarea id="chartDataInput1" name="chartDataInput1" placeholder='Example: {"labels": ["Q1", "Q2", "Q3"], "values": [100, 150, 200]}' rows="3"></textarea>
+                                <small style="color: #666;">Enter data as JSON with "labels" and "values" arrays</small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button type="button" class="add-slide-btn" onclick="addSlide()">+ Add Another Slide</button>
+                    <button type="submit">🚀 Generate PowerPoint Presentation (Advanced)</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <p>🎨 Generating your PowerPoint presentation...</p>
+            <p>This may take a few moments...</p>
+        </div>
+
+        <div class="result" id="result"></div>
+    </div>
+
+    <script src="/static/scripts.js"></script>
+    <script>
+        function toggleAdvancedForm() {
+            const container = document.getElementById('advancedFormContainer');
+            const button = document.querySelector('.toggle-advanced');
+            
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                button.textContent = 'Hide Advanced Options';
+            } else {
+                container.style.display = 'none';
+                button.textContent = 'Show Advanced Options';
+            }
+        }
+    </script>
+</body>
+</html>

@@ -17,8 +17,145 @@ async function testConnectivity() {
 
 // Run connectivity test when page loads
 document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔄 Page loaded, setting up event listeners...');
     testConnectivity();
+    
+    // Add event listener for quick form
+    const quickForm = document.getElementById('quickForm');
+    if (quickForm) {
+        quickForm.addEventListener('submit', handleQuickGeneration);
+        console.log('✅ Event listener added to quick form');
+        
+        // Also add direct button click handler as backup
+        const submitButton = quickForm.querySelector('button');
+        if (submitButton) {
+            submitButton.addEventListener('click', function(e) {
+                console.log('🔘 Button clicked directly!');
+                e.preventDefault();
+                e.stopPropagation();
+                handleQuickGenerationClick();
+                return false;
+            });
+            console.log('✅ Direct button click handler added');
+        }
+    } else {
+        console.error('❌ Quick form not found! Check HTML structure.');
+    }
 });
+
+// Function called directly by button onclick
+function handleQuickGenerationClick() {
+    console.log('🎯 handleQuickGenerationClick called directly!');
+    const form = document.getElementById('quickForm');
+    if (form) {
+        const fakeEvent = {
+            preventDefault: () => {},
+            stopPropagation: () => {},
+            target: form
+        };
+        handleQuickGeneration(fakeEvent);
+    }
+}
+
+// Handle quick generation form submission
+async function handleQuickGeneration(e) {
+    console.log('🚀 Generate button clicked! Form submitted.');
+    e.preventDefault();
+    e.stopPropagation();
+
+    const loading = document.getElementById('loading');
+    const result = document.getElementById('result');
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const formData = new FormData(e.target);
+
+    const searchPhrase = formData.get('searchPhrase');
+    const numberOfSlides = parseInt(formData.get('numberOfSlides'));
+    const presentationType = formData.get('presentationType');
+
+    loading.style.display = 'block';
+    result.style.display = 'none';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Generating...';
+
+    try {
+        console.log(`Generating ${presentationType} presentation for: "${searchPhrase}" with ${numberOfSlides} slides`);
+
+        // Choose the appropriate endpoint based on presentation type
+        const endpoint = presentationType === 'esg' 
+            ? 'https://slider.sd-ai.co.uk/generate-esg-analysis'
+            : 'https://slider.sd-ai.co.uk/generate-slides-from-search';
+
+        const requestBody = {
+            search_phrase: searchPhrase,
+            number_of_slides: numberOfSlides
+        };
+
+        console.log('Sending request to:', endpoint);
+        console.log('Request body:', requestBody);
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(requestBody)
+        });
+
+        console.log('Response status:', response.status);
+
+        if (response.ok) {
+            const data = await response.json();
+            console.log('Response data:', data);
+
+            result.className = 'result success';
+            result.innerHTML = `
+                <h3>✅ Success!</h3>
+                <p>Your ${presentationType === 'esg' ? 'ESG analysis' : 'presentation'} has been generated!</p>
+                <p><strong>Topic:</strong> ${data.search_phrase}</p>
+                <p><strong>Slides Generated:</strong> ${data.slides_generated || numberOfSlides}</p>
+                <p><strong>Download:</strong> <a href="${data.download_url}" target="_blank">Click here to download your presentation</a></p>
+                <div class="debug-info">
+                    <strong>Debug Info:</strong><br>
+                    Endpoint: ${endpoint}<br>
+                    Response status: ${response.status}<br>
+                    Type: ${presentationType}
+                </div>
+            `;
+        } else {
+            const errorData = await response.json();
+            console.error('Response error:', response.status, errorData);
+            throw new Error(`Server error: ${response.status} - ${errorData.error || 'Unknown error'}`);
+        }
+
+    } catch (error) {
+        console.error('Error details:', error);
+
+        let errorMessage = error.message;
+        let debugInfo = error.stack || 'No stack trace available';
+
+        // Provide more specific error messages
+        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+            errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection and try again.';
+            debugInfo += '\nPossible causes:\n- Network connectivity issues\n- CORS policy blocking the request\n- Server temporarily unavailable';
+        }
+
+        result.className = 'result error';
+        result.innerHTML = `
+            <h3>❌ Error</h3>
+            <p>Sorry, there was an error generating your presentation. Please try again.</p>
+            <p>Error details: ${errorMessage}</p>
+            <div class="debug-info">
+                <strong>Debug Info:</strong><br>
+                ${debugInfo}
+            </div>
+        `;
+    } finally {
+        loading.style.display = 'none';
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🚀 Generate Presentation';
+        result.style.display = 'block';
+    }
+}
 
 function addSlide() {
     slideCount++;
@@ -332,9 +469,9 @@ document.getElementById('slideForm').addEventListener('submit', async function(e
 
         console.log('Sending slides data:', slides);
 
-        // Send to N8N webhook for AI processing
-        console.log('Making fetch request to:', 'https://sd-n8n.duckdns.org/webhook-test/slider');
-        const response = await fetch('https://sd-n8n.duckdns.org/webhook-test/slider', {
+        // Send directly to our local PowerPoint generation endpoint
+        console.log('Making fetch request to:', 'https://slider.sd-ai.co.uk/ai-generate-pptx');
+        const response = await fetch('https://slider.sd-ai.co.uk/ai-generate-pptx', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
