@@ -132,7 +132,7 @@
                 Generate presentations instantly by entering a topic and number of slides
             </p>
 
-            <form id="quickForm" class="quick-form" onsubmit="console.log('Form submitted via HTML!'); return false;">
+            <form id="quickForm" class="quick-form">
                 <div class="form-row">
                     <div class="form-group">
                         <label for="searchPhrase">Topic/Search Phrase:</label>
@@ -152,7 +152,7 @@
                         </select>
                     </div>
                 </div>
-                <button type="button" class="generate-btn" onclick="handleQuickGenerationClick(); return false;">🚀 Generate Presentation</button>
+                <button type="submit" class="generate-btn">🚀 Generate Presentation</button>
             </form>
         </div>
 
@@ -232,109 +232,6 @@
 
     <script src="/static/scripts.js?v=20250905-2"></script>
     <script>
-        // Fallback function if external JS doesn't load
-        function handleQuickGenerationClick() {
-            console.log('Quick generation button clicked!');
-            
-            const searchPhrase = document.getElementById('searchPhrase')?.value?.trim();
-            const numberOfSlides = document.getElementById('numberOfSlides')?.value;
-            
-            if (!searchPhrase) {
-                alert('Please enter a search phrase');
-                return;
-            }
-            
-            console.log('Form data:', { searchPhrase, numberOfSlides });
-            
-            // Show loading
-            const loading = document.getElementById('loading');
-            const result = document.getElementById('result');
-            if (loading) loading.style.display = 'block';
-            if (result) result.style.display = 'none';
-            
-            // Make request to the simplified endpoint
-            fetch('https://slider.sd-ai.co.uk/generate-slides-from-search', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    search_phrase: searchPhrase,
-                    number_of_slides: parseInt(numberOfSlides) || 5
-                })
-            })
-            .then(response => {
-                console.log('Response status:', response.status);
-                console.log('Response content-type:', response.headers.get('content-type'));
-                
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                
-                // Check if we got a PowerPoint file
-                const contentType = response.headers.get('content-type') || '';
-                if (contentType.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
-                    return response.blob();
-                } else {
-                    // If not a PowerPoint file, log what we got
-                    return response.text().then(text => {
-                        console.log('Unexpected response type:', contentType);
-                        console.log('Response body:', text.substring(0, 500));
-                        throw new Error(`Expected PowerPoint file but got: ${contentType}. Check console for details.`);
-                    });
-                }
-            })
-            .then(blob => {
-                console.log('Blob received, size:', blob.size);
-                
-                if (blob.size === 0) {
-                    throw new Error('Received empty file');
-                }
-                
-                // Create download
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                const filename = `${searchPhrase.replace(/\s+/g, '_')}_Analysis.pptx`;
-                
-                a.href = url;
-                a.download = filename;
-                a.style.display = 'none';
-                document.body.appendChild(a);
-                a.click();
-                
-                // Cleanup
-                setTimeout(() => {
-                    window.URL.revokeObjectURL(url);
-                    if (document.body.contains(a)) {
-                        document.body.removeChild(a);
-                    }
-                }, 100);
-                
-                // Show success message
-                if (loading) loading.style.display = 'none';
-                if (result) {
-                    result.style.display = 'block';
-                    result.innerHTML = `
-                        <h3>✅ Presentation Downloaded Successfully!</h3>
-                        <p><strong>Topic:</strong> ${searchPhrase}</p>
-                        <p><strong>File:</strong> ${filename}</p>
-                        <p>The PowerPoint file has been automatically downloaded to your computer.</p>
-                    `;
-                }
-            })
-            .catch(error => {
-                console.error('Full error details:', error);
-                
-                if (loading) loading.style.display = 'none';
-                if (result) {
-                    result.style.display = 'block';
-                    result.innerHTML = `
-                        <h3>❌ Error:</h3>
-                        <p>Failed to generate presentation: ${error.message || 'Unknown error'}</p>
-                        <p><small>Check the browser console for more details.</small></p>
-                    `;
-                }
-            });
-        }
-        
         function toggleAdvancedForm() {
             const container = document.getElementById('advancedFormContainer');
             const button = document.querySelector('.toggle-advanced');

@@ -59,6 +59,14 @@ logs/
 temp/
 tmp/
 
+# Test and generated files
+*.pptx
+*.docx
+*.xlsx
+test_*.py
+*_test.py
+*.file
+
 # N8N
 .n8n/
 

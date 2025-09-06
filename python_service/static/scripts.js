@@ -20,42 +20,15 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('🔄 Page loaded, setting up event listeners...');
     testConnectivity();
     
-    // Add event listener for quick form
+    // Add event listener for quick form ONLY
     const quickForm = document.getElementById('quickForm');
     if (quickForm) {
         quickForm.addEventListener('submit', handleQuickGeneration);
-        console.log('✅ Event listener added to quick form');
-        
-        // Also add direct button click handler as backup
-        const submitButton = quickForm.querySelector('button');
-        if (submitButton) {
-            submitButton.addEventListener('click', function(e) {
-                console.log('🔘 Button clicked directly!');
-                e.preventDefault();
-                e.stopPropagation();
-                handleQuickGenerationClick();
-                return false;
-            });
-            console.log('✅ Direct button click handler added');
-        }
+        console.log('✅ Single event listener added to quick form');
     } else {
         console.error('❌ Quick form not found! Check HTML structure.');
     }
 });
-
-// Function called directly by button onclick
-function handleQuickGenerationClick() {
-    console.log('🎯 handleQuickGenerationClick called directly!');
-    const form = document.getElementById('quickForm');
-    if (form) {
-        const fakeEvent = {
-            preventDefault: () => {},
-            stopPropagation: () => {},
-            target: form
-        };
-        handleQuickGeneration(fakeEvent);
-    }
-}
 
 // Handle quick generation form submission
 async function handleQuickGeneration(e) {
@@ -70,7 +43,12 @@ async function handleQuickGeneration(e) {
 
     const searchPhrase = formData.get('searchPhrase');
     const numberOfSlides = parseInt(formData.get('numberOfSlides'));
-    const presentationType = formData.get('presentationType');
+
+    // Prevent double submissions
+    if (submitBtn.disabled) {
+        console.log('Button already disabled, ignoring submission');
+        return;
+    }
 
     loading.style.display = 'block';
     result.style.display = 'none';
@@ -78,22 +56,17 @@ async function handleQuickGeneration(e) {
     submitBtn.textContent = 'Generating...';
 
     try {
-        console.log(`Generating ${presentationType} presentation for: "${searchPhrase}" with ${numberOfSlides} slides`);
-
-        // Choose the appropriate endpoint based on presentation type
-        const endpoint = presentationType === 'esg' 
-            ? 'https://slider.sd-ai.co.uk/generate-esg-analysis'
-            : 'https://slider.sd-ai.co.uk/generate-slides-from-search';
+        console.log(`Generating presentation for: "${searchPhrase}" with ${numberOfSlides} slides`);
 
         const requestBody = {
             search_phrase: searchPhrase,
             number_of_slides: numberOfSlides
         };
 
-        console.log('Sending request to:', endpoint);
+        console.log('Sending request to: /generate-slides-from-search');
         console.log('Request body:', requestBody);
 
-        const response = await fetch(endpoint, {
+        const response = await fetch('/generate-slides-from-search', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -102,52 +75,73 @@ async function handleQuickGeneration(e) {
         });
 
         console.log('Response status:', response.status);
+        console.log('Response content-type:', response.headers.get('content-type'));
 
-        if (response.ok) {
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+
+        // Check if we got a PowerPoint file
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/vnd.openxmlformats-officedocument.presentationml.presentation')) {
+            const blob = await response.blob();
+            console.log('Blob received, size:', blob.size);
+            
+            if (blob.size === 0) {
+                throw new Error('Received empty file');
+            }
+            
+            // Create download
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            const filename = `${searchPhrase.replace(/\s+/g, '_')}_Presentation.pptx`;
+            
+            a.href = url;
+            a.download = filename;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            setTimeout(() => {
+                window.URL.revokeObjectURL(url);
+                if (document.body.contains(a)) {
+                    document.body.removeChild(a);
+                }
+            }, 100);
+
+            result.className = 'result success';
+            result.innerHTML = `
+                <h3>✅ Presentation Downloaded Successfully!</h3>
+                <p><strong>Topic:</strong> ${searchPhrase}</p>
+                <p><strong>Slides:</strong> ${numberOfSlides}</p>
+                <p><strong>File:</strong> ${filename}</p>
+                <p>The PowerPoint file has been automatically downloaded to your computer.</p>
+            `;
+        } else {
+            // Handle JSON response (fallback)
             const data = await response.json();
             console.log('Response data:', data);
 
             result.className = 'result success';
             result.innerHTML = `
                 <h3>✅ Success!</h3>
-                <p>Your ${presentationType === 'esg' ? 'ESG analysis' : 'presentation'} has been generated!</p>
+                <p>Your presentation has been generated!</p>
                 <p><strong>Topic:</strong> ${data.search_phrase}</p>
                 <p><strong>Slides Generated:</strong> ${data.slides_generated || numberOfSlides}</p>
                 <p><strong>Download:</strong> <a href="${data.download_url}" target="_blank">Click here to download your presentation</a></p>
-                <div class="debug-info">
-                    <strong>Debug Info:</strong><br>
-                    Endpoint: ${endpoint}<br>
-                    Response status: ${response.status}<br>
-                    Type: ${presentationType}
-                </div>
             `;
-        } else {
-            const errorData = await response.json();
-            console.error('Response error:', response.status, errorData);
-            throw new Error(`Server error: ${response.status} - ${errorData.error || 'Unknown error'}`);
         }
 
     } catch (error) {
         console.error('Error details:', error);
 
-        let errorMessage = error.message;
-        let debugInfo = error.stack || 'No stack trace available';
-
-        // Provide more specific error messages
-        if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-            errorMessage = 'Network error: Unable to connect to the server. Please check your internet connection and try again.';
-            debugInfo += '\nPossible causes:\n- Network connectivity issues\n- CORS policy blocking the request\n- Server temporarily unavailable';
-        }
-
         result.className = 'result error';
         result.innerHTML = `
             <h3>❌ Error</h3>
             <p>Sorry, there was an error generating your presentation. Please try again.</p>
-            <p>Error details: ${errorMessage}</p>
-            <div class="debug-info">
-                <strong>Debug Info:</strong><br>
-                ${debugInfo}
-            </div>
+            <p>Error details: ${error.message || 'Unknown error'}</p>
+            <p><small>Check the browser console for more details.</small></p>
         `;
     } finally {
         loading.style.display = 'none';

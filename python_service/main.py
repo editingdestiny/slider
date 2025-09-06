@@ -211,18 +211,43 @@ async def startup_event():
     cleanup_old_files()
     logger.info("Application started and old files cleaned up")
 
+# Request deduplication tracking
+recent_requests = {}
+REQUEST_COOLDOWN = 3  # seconds
+
 @app.post("/generate-slides-from-search")
 async def generate_slides_from_search(request: SlideGenerationRequest):
     """Generate PowerPoint slides by triggering n8n webhook and return the file"""
+    global recent_requests
+    current_time = time.time()
+    request_id = f"{request.search_phrase}_{int(current_time)}"
+    
+    # Deduplication check with more precise timing
+    request_key = f"{request.search_phrase}_{request.number_of_slides}"
+    
+    if request_key in recent_requests:
+        time_diff = current_time - recent_requests[request_key]
+        if time_diff < REQUEST_COOLDOWN:
+            logger.warning(f"[{request_id}] DUPLICATE REQUEST BLOCKED: Same request made {time_diff:.2f}s ago")
+            return {"error": f"Duplicate request detected. Please wait {REQUEST_COOLDOWN - time_diff:.1f} seconds before trying again.", "status": "rate_limited"}
+    
+    recent_requests[request_key] = current_time
+    
+    # Clean up old entries (older than 10 seconds)
+    cutoff_time = current_time - 10
+    recent_requests = {k: v for k, v in recent_requests.items() if v > cutoff_time}
+    
     try:
-        logger.info(f"Triggering n8n webhook for: {request.search_phrase}, {request.number_of_slides} slides")
+        logger.info(f"[{request_id}] NEW REQUEST: Triggering n8n webhook for: {request.search_phrase}, {request.number_of_slides} slides")
         
         # Prepare payload for n8n webhook
         webhook_payload = {
             "search_phrase": request.search_phrase,
             "number_of_slides": request.number_of_slides,
-            "timestamp": time.time()
+            "timestamp": current_time
         }
+        
+        logger.info(f"[{request_id}] Sending to n8n: {webhook_payload}")
         
         # Trigger n8n webhook and expect binary file response
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -230,11 +255,13 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
                 response = await client.post(N8N_WEBHOOK_URL, json=webhook_payload)
                 response.raise_for_status()
                 
+                logger.info(f"[{request_id}] n8n response received, status: {response.status_code}")
+                
                 # Check if response is binary (PowerPoint file)
                 content_type = response.headers.get('content-type', '')
                 if 'application/vnd.openxmlformats-officedocument.presentationml.presentation' in content_type:
                     # Return the PowerPoint file directly
-                    logger.info(f"Received PowerPoint file from n8n webhook, returning file")
+                    logger.info(f"[{request_id}] Received PowerPoint file from n8n webhook, returning file")
                     filename = f"{request.search_phrase.replace(' ', '_')}_Analysis.pptx"
                     
                     # Save temporarily to return as FileResponse
