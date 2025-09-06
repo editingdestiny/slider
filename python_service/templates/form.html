@@ -85,37 +85,6 @@
             transform: translateY(-2px);
             box-shadow: 0 7px 20px rgba(255,107,107,0.6);
         }
-        
-        .advanced-section {
-            text-align: center;
-            margin: 40px 0;
-            padding: 20px;
-            background: #f8f9fa;
-            border-radius: 10px;
-        }
-        
-        .toggle-advanced {
-            background: #6c757d;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 25px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .toggle-advanced:hover {
-            background: #5a6268;
-            transform: translateY(-1px);
-        }
-        
-        .advanced-form {
-            margin-top: 30px;
-            padding: 20px;
-            border: 2px dashed #dee2e6;
-            border-radius: 10px;
-            background: #fff;
-        }
     </style>
 </head>
 <body>
@@ -145,10 +114,6 @@
                         <select id="numberOfSlides" name="numberOfSlides">
                             <option value="3">3 slides</option>
                             <option value="5" selected>5 slides</option>
-                            <option value="8">8 slides</option>
-                            <option value="10">10 slides</option>
-                            <option value="12">12 slides</option>
-                            <option value="15">15 slides</option>
                         </select>
                     </div>
                 </div>
@@ -156,94 +121,14 @@
             </form>
         </div>
 
-        <!-- Advanced/Manual Section -->
-        <div class="advanced-section">
-            <h2>⚙️ Advanced Manual Creation</h2>
-            <p style="color: #666; margin-bottom: 20px;">
-                Create custom presentations by defining each slide manually
-            </p>
-            <button type="button" class="toggle-advanced" onclick="toggleAdvancedForm()">
-                Show Advanced Options
-            </button>
-            
-            <div id="advancedFormContainer" style="display: none;" class="advanced-form">
-                <form id="slideForm">
-                    <div id="slidesContainer">
-                        <div class="slide-input" data-slide="1">
-                            <div class="slide-header">
-                                <span class="slide-number">Slide 1</span>
-                                <button type="button" class="remove-slide" onclick="removeSlide(1)" style="display: none;">Remove</button>
-                            </div>
-                            <div class="form-group">
-                                <label for="title1">Slide Title:</label>
-                                <input type="text" id="title1" name="title1" placeholder="Enter slide title..." required>
-                            </div>
-                            <div class="form-group">
-                                <label for="headline1">Slide Headline:</label>
-                                <input type="text" id="headline1" name="headline1" placeholder="Enter slide headline..." required>
-                            </div>
-                            <div class="form-group">
-                                <label for="content1">Slide Content/Data:</label>
-                                <textarea id="content1" name="content1" placeholder="Enter slide content or data points..." required></textarea>
-                            </div>
-                            <div class="form-group">
-                                <label for="backgroundColor1">Background Color:</label>
-                                <select id="backgroundColor1" name="backgroundColor1">
-                                    <option value="#FFFFFF">White</option>
-                                    <option value="#F8F9FA">Light Gray</option>
-                                    <option value="#1565C0">Corporate Blue</option>
-                                    <option value="#2E7D32">Professional Green</option>
-                                    <option value="#6D4C41">Executive Brown</option>
-                                    <option value="#424242">Business Gray</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="chartType1">Chart Type (Optional):</label>
-                                <select id="chartType1" name="chartType1" onchange="toggleChartData(1)">
-                                    <option value="">No Chart</option>
-                                    <option value="bar">Bar Chart</option>
-                                    <option value="pie">Pie Chart</option>
-                                    <option value="line">Line Chart</option>
-                                    <option value="column">Column Chart</option>
-                                </select>
-                            </div>
-                            <div class="form-group chart-data" id="chartData1" style="display: none;">
-                                <label for="chartDataInput1">Chart Data (JSON format):</label>
-                                <textarea id="chartDataInput1" name="chartDataInput1" placeholder='Example: {"labels": ["Q1", "Q2", "Q3"], "values": [100, 150, 200]}' rows="3"></textarea>
-                                <small style="color: #666;">Enter data as JSON with "labels" and "values" arrays</small>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button type="button" class="add-slide-btn" onclick="addSlide()">+ Add Another Slide</button>
-                    <button type="submit">🚀 Generate PowerPoint Presentation (Advanced)</button>
-                </form>
-            </div>
-        </div>
-
         <div class="loading" id="loading">
-            <p>� Triggering n8n workflow...</p>
-            <p>📡 Sending request to automation system...</p>
-            <p>This may take a moment...</p>
+            <div class="spinner"></div>
+            <p id="loading-message">Initializing...</p>
         </div>
 
         <div class="result" id="result"></div>
     </div>
 
     <script src="/static/scripts.js?v=20250905-2"></script>
-    <script>
-        function toggleAdvancedForm() {
-            const container = document.getElementById('advancedFormContainer');
-            const button = document.querySelector('.toggle-advanced');
-            
-            if (container.style.display === 'none') {
-                container.style.display = 'block';
-                button.textContent = 'Hide Advanced Options';
-            } else {
-                container.style.display = 'none';
-                button.textContent = 'Show Advanced Options';
-            }
-        }
-    </script>
 </body>
 </html>

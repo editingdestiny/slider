@@ -10,9 +10,9 @@ import numpy as np
 from datetime import datetime
 
 # --- Dark Mode Branding Constants ---
-text_font = 'Arial'
-key_font = 'Arial Bold'
-heading_font = 'Arial Bold'
+text_font = 'Segoe UI'
+key_font = 'Segoe UI Bold'
+heading_font = 'Segoe UI Bold'
 
 # --- Slide Dimension Constants ---
 SLIDE_WIDTH = Inches(16)
@@ -120,37 +120,60 @@ class GeneralPresentation:
         labels = chart_data['labels']
         values = chart_data['values']
         
+        # Validate data to prevent division by zero
+        if not labels or not values or len(labels) == 0 or len(values) == 0:
+            return None
+            
+        # Convert values to float and handle zero/negative values for pie charts
+        try:
+            values = [float(v) if v is not None else 0 for v in values]
+        except (ValueError, TypeError):
+            return None
+            
+        # For pie charts, ensure we have positive values
+        if chart_type == "pie":
+            values = [abs(v) if v != 0 else 0.1 for v in values]  # Replace zeros with small positive values
+            if sum(values) == 0:
+                return None
+        
         fig, ax = plt.subplots(figsize=(8, 6))
         fig.patch.set_facecolor('none')
         ax.set_facecolor('none')
         
-        if chart_type == "pie":
-            wedges, texts, autotexts = ax.pie(
-                values, labels=labels, autopct='%.1f%%', startangle=90,
-                colors=BRAND_COLORS[:len(values)], textprops={'color': 'white'}
-            )
-            plt.setp(autotexts, size=10, weight="bold", fontname=key_font)
-            plt.setp(texts, size=12, fontname=text_font)
-        
-        elif chart_type == "bar":
-            bars = ax.bar(labels, values, color=BRAND_COLORS[:len(values)])
-            ax.set_ylabel('Values', color='white')
-            ax.set_xlabel('Categories', color='white')
-            ax.tick_params(colors='white')
+        try:
+            if chart_type == "pie":
+                wedges, texts, autotexts = ax.pie(
+                    values, labels=labels, autopct='%.1f%%', startangle=90,
+                    colors=BRAND_COLORS[:len(values)], textprops={'color': 'white'}
+                )
+                plt.setp(autotexts, size=10, weight="bold", fontname=key_font)
+                plt.setp(texts, size=12, fontname=text_font)
             
-            # Add value labels on bars
-            for bar, value in zip(bars, values):
-                height = bar.get_height()
-                ax.text(bar.get_x() + bar.get_width()/2., height,
-                       f'{value}', ha='center', va='bottom', color='white', fontweight='bold')
+            elif chart_type == "bar":
+                bars = ax.bar(labels, values, color=BRAND_COLORS[:len(values)])
+                ax.set_ylabel('Values', color='white')
+                ax.set_xlabel('Categories', color='white')
+                ax.tick_params(colors='white')
+                
+                # Add value labels on bars
+                for bar, value in zip(bars, values):
+                    height = bar.get_height()
+                    if height > 0:  # Only add labels for positive values
+                        ax.text(bar.get_x() + bar.get_width()/2., height,
+                               f'{value}', ha='center', va='bottom', color='white', fontweight='bold')
+            
+            elif chart_type == "line":
+                ax.plot(labels, values, marker='o', linewidth=3, markersize=8, 
+                       color=BRAND_COLORS[0], markerfacecolor=BRAND_COLORS[1])
+                ax.set_ylabel('Values', color='white')
+                ax.set_xlabel('Categories', color='white')
+                ax.tick_params(colors='white')
+                ax.grid(True, alpha=0.3, color='white')
         
-        elif chart_type == "line":
-            ax.plot(labels, values, marker='o', linewidth=3, markersize=8, 
-                   color=BRAND_COLORS[0], markerfacecolor=BRAND_COLORS[1])
-            ax.set_ylabel('Values', color='white')
-            ax.set_xlabel('Categories', color='white')
-            ax.tick_params(colors='white')
-            ax.grid(True, alpha=0.3, color='white')
+        except Exception as e:
+            print(f"Error creating {chart_type} chart: {str(e)}")
+            plt.close(fig)
+            return None
         
         ax.spines['bottom'].set_color('white')
         ax.spines['top'].set_color('white')
@@ -284,17 +307,21 @@ class GeneralPresentation:
         chart_type = slide_data.get('chartType', 'bar')
         
         if chart_data:
-            chart_image = self._create_data_chart(chart_data, chart_type)
-            if chart_image:
-                chart_width, chart_height = calculate_chart_size()
-                chart_left = SLIDE_WIDTH - chart_width - SLIDE_MARGIN
-                chart_top = CONTENT_TOP
-                
-                chart_left, chart_top, chart_width, chart_height = ensure_content_fits(
-                    chart_left, chart_top, chart_width, chart_height
-                )
-                
-                slide.shapes.add_picture(chart_image, chart_left, chart_top, width=chart_width)
+            try:
+                chart_image = self._create_data_chart(chart_data, chart_type)
+                if chart_image:
+                    chart_width, chart_height = calculate_chart_size()
+                    chart_left = SLIDE_WIDTH - chart_width - SLIDE_MARGIN
+                    chart_top = CONTENT_TOP
+                    
+                    chart_left, chart_top, chart_width, chart_height = ensure_content_fits(
+                        chart_left, chart_top, chart_width, chart_height
+                    )
+                    
+                    slide.shapes.add_picture(chart_image, chart_left, chart_top, width=chart_width)
+            except Exception as e:
+                print(f"Warning: Could not create chart for slide: {str(e)}")
+                # Continue without chart
         
         # Add table if data is available
         table_data = slide_data.get('tableData')

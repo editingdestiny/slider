@@ -13,8 +13,38 @@ import time
 import httpx
 from pathlib import Path
 from dotenv import load_dotenv
-from pptx_generator import create_pptx_from_json
-from general_presentation import create_general_presentation
+from general_presentation import create_general_presentation  # Main generator with charts
+
+def create_presentation_with_real_charts(data, output_path):
+    """
+    Create presentation using general_presentation for real chart graphics
+    """
+    try:
+        logger.info("Using general_presentation for real chart graphics")
+        
+        # Extract search phrase for context
+        search_phrase = "Business Analysis"
+        if isinstance(data, dict):
+            search_phrase = data.get('search_phrase', 'Business Analysis')
+            if 'slides' in data and data['slides']:
+                # Try to extract topic from first slide title
+                first_slide = data['slides'][0]
+                if first_slide.get('title'):
+                    search_phrase = first_slide['title']
+        
+        # Use general_presentation which has real chart capabilities
+        presentation = create_general_presentation(data, search_phrase)
+        if presentation:
+            presentation.save(output_path)
+            logger.info(f"Successfully created presentation with real charts: {output_path}")
+            return True
+        else:
+            logger.error("general_presentation failed to create presentation")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error in chart presentation creation: {str(e)}")
+        return False
 
 # Load environment variables
 load_dotenv()
@@ -68,107 +98,6 @@ async def root():
             return f.read()
     except FileNotFoundError:
         return HTMLResponse(content="<h1>Template not found</h1>", status_code=500)
-
-@app.post("/ai-generate-pptx")
-async def ai_generate_pptx(request: Request):
-    """Generate PowerPoint from AI-enhanced JSON data (for n8n workflow)"""
-    try:
-        # Accept raw JSON from n8n workflow
-        data = await request.json()
-        logger.info(f"Received AI-enhanced data: {json.dumps(data, indent=2)}")
-
-        # Handle different data formats from N8N
-        slides_data = None
-        
-        if isinstance(data, list):
-            # If it's an array, take the first element
-            if len(data) > 0:
-                first_item = data[0]
-                if "slides" in first_item:
-                    slides_data = first_item["slides"]
-                else:
-                    # Treat the array items as individual slides
-                    slides_data = data
-            else:
-                return {"error": "Empty array received", "status": "error"}
-        elif isinstance(data, dict):
-            if "slides" in data:
-                # Standard format: {"slides": [...]}
-                slides_data = data["slides"]
-            else:
-                # Single slide object: {"title": "...", "headline": "...", "content": "..."}
-                slides_data = [data]
-        else:
-            return {"error": "Invalid data format. Expected object or array", "status": "error"}
-
-        if not slides_data:
-            return {"error": "No slides data found", "status": "error"}
-
-        # Create the expected format for the generator
-        slides_json = {"slides": slides_data}
-
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-            success = create_pptx_from_json(slides_json, tmp.name)
-            if not success:
-                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
-
-            # Store file in a more persistent location
-            import shutil
-            persistent_path = f"/tmp/pptx_{tmp.name.split('/')[-1]}"
-            shutil.move(tmp.name, persistent_path)
-
-            # Generate download URL using configured base URL
-            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-            logger.info(f"Generated download URL: {download_url}")
-
-            return {
-                "download_url": download_url,
-                "filename": "slides.pptx",
-                "status": "success",
-                "slides_processed": len(slides_data)
-            }
-
-    except Exception as e:
-        logger.error(f"Error in AI PPTX generation: {str(e)}")
-        return {"error": f"Failed to generate presentation: {str(e)}", "status": "error"}
-
-@app.post("/generate-pptx")
-async def generate_pptx(request: Request):
-    """Generate PowerPoint from JSON data (for web form)"""
-    try:
-        # Accept JSON from web form
-        data = await request.json()
-        logger.info(f"Received data: {json.dumps(data, indent=2)}")
-
-        if not data or "slides" not in data:
-            return {"error": "Invalid data format. Expected {'slides': [...]}", "status": "error"}
-
-        slides_json = data  # Data is already parsed JSON
-
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-            success = create_pptx_from_json(slides_json, tmp.name)
-            if not success:
-                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
-
-            # Store file in a more persistent location
-            import shutil
-            persistent_path = f"/tmp/pptx_{tmp.name.split('/')[-1]}"
-            shutil.move(tmp.name, persistent_path)
-
-            # Generate download URL using configured base URL
-            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-            logger.info(f"Generated download URL: {download_url}")
-
-            return {
-                "download_url": download_url,
-                "filename": "slides.pptx",
-                "status": "success",
-                "slides_processed": len(slides_json.get("slides", []))
-            }
-
-    except Exception as e:
-        logger.error(f"Error in PPTX generation: {str(e)}")
-        return {"error": f"Failed to generate presentation: {str(e)}", "status": "error"}
 
 @app.get("/download/{filename}")
 async def download_file(filename: str):
@@ -250,9 +179,16 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
         logger.info(f"[{request_id}] Sending to n8n: {webhook_payload}")
         
         # Trigger n8n webhook and expect binary file response
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             try:
                 response = await client.post(N8N_WEBHOOK_URL, json=webhook_payload)
+
+                # --- TEMPORARY LOGGING START ---
+                # logger.info(f"N8N_RESPONSE_STATUS: {response.status_code}")
+                # logger.info(f"N8N_RESPONSE_HEADERS: {response.headers}")
+                # logger.info(f"N8N_RESPONSE_BODY (first 200 bytes): {response.content[:200]}")
+                # --- TEMPORARY LOGGING END ---
+                
                 response.raise_for_status()
                 
                 logger.info(f"[{request_id}] n8n response received, status: {response.status_code}")
@@ -296,11 +232,10 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
 
 @app.post("/create-presentation")
 async def create_presentation(content_data: dict):
-    """Direct endpoint for n8n to create general business presentations"""
+    """Direct endpoint for n8n to create general business presentations - returns file directly"""
     try:
         search_phrase = content_data.get("search_phrase", "Analysis")
-        return_file = content_data.get("return_file", False)
-        logger.info(f"Creating general presentation for: {search_phrase}, return_file: {return_file}")
+        logger.info(f"Creating general presentation for: {search_phrase}")
         
         # Handle data field if nested
         data = content_data.get("data", content_data)
@@ -403,94 +338,24 @@ async def create_presentation(content_data: dict):
                 presentation.save(tmp.name)
                 success = True
             else:
-                # Fallback to basic generator if rich generator fails
-                logger.warning("Rich presentation failed, falling back to basic generator")
-                success = create_pptx_from_json(data, tmp.name)
+                logger.error("Failed to generate presentation with general_presentation")
+                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
             
             if not success:
                 return {"error": "Failed to create PowerPoint presentation", "status": "error"}
             
-            # Return file directly if requested
-            if return_file:
-                filename = f"{search_phrase.replace(' ', '_')}_Presentation.pptx"
-                logger.info(f"Returning presentation file directly: {filename}")
-                return FileResponse(
-                    path=tmp.name,
-                    filename=filename,
-                    media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
-                )
-            
-            # Store file persistently for download URL
-            persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
-            shutil.move(tmp.name, persistent_path)
-            
-            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-            logger.info(f"Generated presentation: {download_url}")
-            
-            return {
-                "download_url": download_url,
-                "filename": f"{search_phrase.replace(' ', '_')}_Presentation.pptx",
-                "status": "success",
-                "presentation_type": "General",
-                "slides_generated": len(data.get("slides", [])),
-                "search_phrase": search_phrase
-            }
+            # Return file directly (hardcoded for n8n compatibility)
+            filename = f"{search_phrase.replace(' ', '_')}_Presentation.pptx"
+            logger.info(f"Returning presentation file directly: {filename}")
+            return FileResponse(
+                path=tmp.name,
+                filename=filename,
+                media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
             
     except Exception as e:
         logger.error(f"Error creating presentation: {str(e)}")
         return {"error": f"Failed to create presentation: {str(e)}", "status": "error"}
-
-@app.post("/process-ai-content")
-async def process_ai_content(ai_data: dict):
-    """Process AI-generated content and create general business presentation"""
-    try:
-        logger.info(f"Processing AI-generated content: {type(ai_data)}")
-        
-        # Always process as general slides with rich visuals
-        logger.info("Processing general slides content with rich presentation generator")
-        
-        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
-            # Try to use the new rich presentation generator first
-            presentation = create_general_presentation(ai_data, ai_data.get('search_phrase', 'Analysis'))
-            if presentation:
-                presentation.save(tmp.name)
-                success = True
-            else:
-                # Fallback to basic generator if rich generator fails
-                logger.warning("Rich presentation failed, falling back to basic generator")
-                success = create_pptx_from_json(ai_data, tmp.name)
-            
-            if not success:
-                return {"error": "Failed to create PowerPoint presentation", "status": "error"}
-            
-            # Store file persistently
-            persistent_path = f"/tmp/slides_pptx_{tmp.name.split('/')[-1]}"
-            shutil.move(tmp.name, persistent_path)
-            
-            download_url = f"{DOWNLOAD_BASE_URL}/download/{persistent_path.split('/')[-1]}"
-            logger.info(f"Generated general presentation: {download_url}")
-            
-            return {
-                "download_url": download_url,
-                "filename": f"Presentation.pptx",
-                "status": "success",
-                "presentation_type": "General",
-                "slides_generated": len(ai_data.get("slides", []))
-            }
-            
-    except Exception as e:
-        logger.error(f"Error processing AI content: {str(e)}")
-        return {"error": f"Failed to process AI content: {str(e)}", "status": "error"}
-
-@app.get("/cleanup")
-async def manual_cleanup():
-    """Manually trigger cleanup of old files"""
-    try:
-        cleanup_old_files()
-        return {"status": "success", "message": "Old files cleaned up"}
-    except Exception as e:
-        logger.error(f"Error during manual cleanup: {str(e)}")
-        return {"status": "error", "message": str(e)}
 
 @app.get("/health")
 async def health_check():
