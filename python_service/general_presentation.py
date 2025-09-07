@@ -32,19 +32,21 @@ BRAND_COLORS = ['#007ACC', '#09534F', '#4CAF50', '#FF9800', '#F44336', '#9C27B0'
 HYPERLINK_COLOR = RGBColor(0xFF, 0xFF, 0xFF)
 
 # --- Helper Functions ---
-def set_title_style(title_shape, presentation_width):
+def set_title_style(title_shape, presentation_width, customization=None):
     title_shape.left = Inches(0)
     title_shape.width = SLIDE_WIDTH
     title_shape.height = TITLE_HEIGHT
-    title_shape.fill.background()
+    title_shape.fill.solid()
+    title_shape.fill.fore_color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A')) if customization else TABLE_HEADER_BG_COLOR
     line = title_shape.line
-    line.color.rgb = TABLE_HEADER_BG_COLOR
+    line.color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A')) if customization else TABLE_HEADER_BG_COLOR
     line.width = Pt(1)
     font = title_shape.text_frame.paragraphs[0].font
     font.name = heading_font
     font.size = Pt(28)
-    font.color.rgb = DEFAULT_TEXT_COLOR
-    title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT
+    font.color.rgb = hex_to_rgb(customization.get('title_font_color', '#FFFFFF')) if customization else DEFAULT_TEXT_COLOR
+    position = customization.get('title_position', 'left') if customization else 'left'
+    title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER if position == 'center' else PP_ALIGN.LEFT
     tf = title_shape.text_frame
     tf.margin_left = Inches(0.2)
     tf.margin_right = Inches(0.2)
@@ -81,10 +83,18 @@ class GeneralPresentation:
         self.prs.slide_height = Inches(9)
         self.MAX_ROWS_PER_TABLE = 10
         
+        # Default customization values
+        self.slide_bg_color = SLIDE_BACKGROUND_COLOR
+        self.body_text_color = DEFAULT_TEXT_COLOR
+        self.title_bg_color = TABLE_HEADER_BG_COLOR
+        self.title_font_color = DEFAULT_TEXT_COLOR
+        self.font_size = Pt(16)
+        self.title_position = 'left'
+        
         # Set background for all layouts
         for layout in self.prs.slide_layouts:
             layout.background.fill.solid()
-            layout.background.fill.fore_color.rgb = SLIDE_BACKGROUND_COLOR
+            layout.background.fill.fore_color.rgb = self.slide_bg_color
     
     def _set_cell_style(self, cell, text, is_header=False, is_dark_row=False):
         """Style table cells with professional formatting"""
@@ -387,10 +397,26 @@ class GeneralPresentation:
             p_step.font.size = Pt(16)
             p_step.font.color.rgb = DEFAULT_TEXT_COLOR
 
-def create_general_presentation(data, search_phrase="Business Analysis"):
+def create_general_presentation(data, search_phrase="Business Analysis", customization=None):
     """Main function to create a general business presentation"""
     try:
+        # Ensure data is parsed if it's a JSON string
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                raise ValueError("Input data is not valid JSON.")
+        
         presentation = GeneralPresentation(data, search_phrase)
+        
+        # Apply customization settings
+        if customization:
+            presentation.slide_bg_color = hex_to_rgb(customization.get('slide_bg_color', '#0F1632'))
+            presentation.body_text_color = hex_to_rgb(customization.get('body_text_color', '#FFFFFF'))
+            presentation.title_bg_color = hex_to_rgb(customization.get('title_bg_color', '#44546A'))
+            presentation.title_font_color = hex_to_rgb(customization.get('title_font_color', '#FFFFFF'))
+            presentation.font_size = Pt(customization.get('font_size', 16))
+            presentation.title_position = customization.get('title_position', 'left')
         
         # Add title slide
         presentation.add_title_slide()

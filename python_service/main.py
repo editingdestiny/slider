@@ -69,12 +69,21 @@ load_dotenv()
 
 # Configuration
 DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "https://slider.sd-ai.co.uk")
-N8N_WEBHOOK_URL = "https://sd-n8n.duckdns.org/webhook/slider"
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://sd-n8n.duckdns.org/webhook/slider")  # Production default
 
 # Pydantic models for request validation
+class CustomizationOptions(BaseModel):
+    slide_bg_color: str = "#0F1632"
+    title_font_color: str = "#FFFFFF"
+    title_bg_color: str = "#44546A"
+    body_text_color: str = "#FFFFFF"
+    title_position: str = "left"
+    font_size: int = 16
+
 class SlideGenerationRequest(BaseModel):
     search_phrase: str
     number_of_slides: int = 5  # Default to 5 slides
+    customization: CustomizationOptions = None
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -191,6 +200,7 @@ async def generate_slides_from_search(request: SlideGenerationRequest):
         webhook_payload = {
             "search_phrase": request.search_phrase,
             "number_of_slides": request.number_of_slides,
+            "customization": request.customization.dict() if request.customization else None,
             "timestamp": current_time
         }
         
@@ -267,6 +277,15 @@ async def create_presentation(content_data: dict):
         
         # Handle data field if nested
         data = content_data.get("data", content_data)
+        customization = content_data.get("customization")
+
+        # If data is a string, parse it as JSON
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except json.JSONDecodeError:
+                logger.error("Failed to parse 'data' string as JSON.")
+                return {"error": "Invalid format for 'data' field.", "status": "error"}
         
         # Check if data has slides directly or if we need to convert from old format
         if "slides" not in data:
@@ -361,7 +380,7 @@ async def create_presentation(content_data: dict):
         
         with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
             # Try to use the new rich presentation generator first
-            presentation = create_general_presentation(data, search_phrase)
+            presentation = create_general_presentation(data, search_phrase, customization)
             if presentation:
                 presentation.save(tmp.name)
                 
