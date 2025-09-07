@@ -69,7 +69,7 @@ load_dotenv()
 
 # Configuration
 DOWNLOAD_BASE_URL = os.getenv("DOWNLOAD_BASE_URL", "https://slider.sd-ai.co.uk")
-N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "https://sd-n8n.duckdns.org/webhook/slider")  # Production default
+N8N_WEBHOOK_URL = "https://sd-n8n.duckdns.org/webhook/slider"  # Production webhook
 
 # Pydantic models for request validation
 class CustomizationOptions(BaseModel):
