@@ -8,8 +8,7 @@ services:
       - "8010:8010"
     environment:
       - DOWNLOAD_BASE_URL=https://slider.sd-ai.co.uk
-    volumes:
-      - ./python_service:/app
+      - N8N_WEBHOOK_URL=https://sd-n8n.duckdns.org/webhook/slider
     networks:
       - traefik_network
     labels:

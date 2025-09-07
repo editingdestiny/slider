@@ -18,6 +18,16 @@ async function handleQuickGeneration(e) {
     const searchPhrase = formData.get('searchPhrase');
     const numberOfSlides = parseInt(formData.get('numberOfSlides'));
 
+    // Gather customization options
+    const customization = {
+        slide_bg_color: document.getElementById('slideBgColor').value,
+        title_font_color: document.getElementById('titleFontColor').value,
+        title_bg_color: document.getElementById('titleBgColor').value,
+        body_text_color: document.getElementById('bodyTextColor').value,
+        title_position: document.getElementById('titlePosition').value,
+        font_size: parseInt(document.getElementById('fontSize').value)
+    };
+
     // Prevent double submissions
     if (submitBtn.disabled) return;
 
@@ -53,7 +63,8 @@ async function handleQuickGeneration(e) {
             },
             body: JSON.stringify({
                 search_phrase: searchPhrase,
-                number_of_slides: numberOfSlides
+                number_of_slides: numberOfSlides,
+                customization: customization
             })
         });
 
