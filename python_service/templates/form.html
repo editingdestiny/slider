@@ -121,6 +121,88 @@
             </form>
         </div>
 
+        <style>
+            .customization-details {
+                background: #f9f9f9;
+                border-radius: 10px;
+                padding: 20px;
+                margin-top: 20px;
+                border: 1px solid #eee;
+            }
+            .customization-details summary {
+                font-weight: bold;
+                cursor: pointer;
+                font-size: 1.1em;
+                color: #333;
+            }
+            .customization-grid {
+                display: grid;
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+                gap: 20px;
+                margin-top: 15px;
+            }
+            .customization-grid .form-group {
+                background: #fff;
+                padding: 15px;
+                border-radius: 8px;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            }
+            .customization-grid label {
+                font-weight: normal;
+                color: #555;
+                margin-bottom: 8px;
+                display: block;
+            }
+            .customization-grid input[type="color"] {
+                width: 100%;
+                height: 40px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                padding: 0;
+                cursor: pointer;
+            }
+            .customization-grid input, .customization-grid select {
+                width: 100%;
+                padding: 8px;
+                border: 1px solid #ddd;
+                border-radius: 5px;
+                box-sizing: border-box;
+            }
+        </style>
+        
+        <details class="customization-details">
+            <summary>🎨 Advanced Customization</summary>
+            <div class="customization-grid">
+                <div class="form-group">
+                    <label for="slideBgColor">Slide Background Color:</label>
+                    <input type="color" id="slideBgColor" name="slideBgColor" value="#0F1632">
+                </div>
+                <div class="form-group">
+                    <label for="titleFontColor">Slide Title Font Color:</label>
+                    <input type="color" id="titleFontColor" name="titleFontColor" value="#FFFFFF">
+                </div>
+                <div class="form-group">
+                    <label for="titleBgColor">Slide Title Background:</label>
+                    <input type="color" id="titleBgColor" name="titleBgColor" value="#44546A">
+                </div>
+                <div class="form-group">
+                    <label for="bodyTextColor">Body Text Font Color:</label>
+                    <input type="color" id="bodyTextColor" name="bodyTextColor" value="#FFFFFF">
+                </div>
+                <div class="form-group">
+                    <label for="titlePosition">Title Position:</label>
+                    <select id="titlePosition" name="titlePosition">
+                        <option value="left">Left</option>
+                        <option value="center">Center</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fontSize">Font Size (Pt):</label>
+                    <input type="number" id="fontSize" name="fontSize" value="16" min="8" max="72">
+                </div>
+            </div>
+        </details>
+
         <div class="loading" id="loading">
             <div class="spinner"></div>
             <p id="loading-message">Initializing...</p>

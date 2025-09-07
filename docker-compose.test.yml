@@ -1,0 +1,24 @@
+version: '3.8'
+services:
+  python_service_test:
+    build: ./python_service
+    container_name: slider-test
+    restart: always
+    environment:
+      - DOWNLOAD_BASE_URL=https://slider-test.sd-ai.co.uk
+      - N8N_WEBHOOK_URL=https://sd-n8n.duckdns.org/webhook-test/slider-test
+    volumes:
+      - ./python_service:/app
+    networks:
+      - traefik_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.slider-test.entrypoints=websecure"
+      - "traefik.http.routers.slider-test.rule=Host(`slider-test.sd-ai.co.uk`)"
+      - "traefik.http.routers.slider-test.tls=true"
+      - "traefik.http.routers.slider-test.tls.certresolver=letsencrypt"
+      - "traefik.http.services.slider-test.loadbalancer.server.port=8010"
+
+networks:
+  traefik_network:
+    external: true

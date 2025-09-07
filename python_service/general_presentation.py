@@ -9,6 +9,12 @@ from pptx.enum.text import PP_ALIGN, MSO_VERTICAL_ANCHOR, MSO_AUTO_SIZE
 import numpy as np
 from datetime import datetime
 
+# --- Helper Functions ---
+def hex_to_rgb(hex_color):
+    """Convert hex color string to RGBColor object."""
+    hex_color = hex_color.lstrip('#')
+    return RGBColor.from_string(hex_color)
+
 # --- Dark Mode Branding Constants ---
 text_font = 'Segoe UI'
 key_font = 'Segoe UI Bold'
@@ -23,6 +29,7 @@ CONTENT_TOP = Inches(1.2)
 CONTENT_MAX_WIDTH = SLIDE_WIDTH - (2 * SLIDE_MARGIN)
 CONTENT_MAX_HEIGHT = SLIDE_HEIGHT - CONTENT_TOP - SLIDE_MARGIN
 
+# --- Slide Dimension Constants ---
 SLIDE_BACKGROUND_COLOR = RGBColor(15, 22, 50)
 DEFAULT_TEXT_COLOR = RGBColor(0xFF, 0xFF, 0xFF)
 TABLE_HEADER_BG_COLOR = RGBColor(0x44, 0x54, 0x6A)
@@ -32,21 +39,26 @@ BRAND_COLORS = ['#007ACC', '#09534F', '#4CAF50', '#FF9800', '#F44336', '#9C27B0'
 HYPERLINK_COLOR = RGBColor(0xFF, 0xFF, 0xFF)
 
 # --- Helper Functions ---
-def set_title_style(title_shape, presentation_width, customization=None):
+def set_title_style(title_shape, presentation_width, customization):
     title_shape.left = Inches(0)
     title_shape.width = SLIDE_WIDTH
     title_shape.height = TITLE_HEIGHT
     title_shape.fill.solid()
-    title_shape.fill.fore_color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A')) if customization else TABLE_HEADER_BG_COLOR
+    title_shape.fill.fore_color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A'))
     line = title_shape.line
-    line.color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A')) if customization else TABLE_HEADER_BG_COLOR
+    line.color.rgb = hex_to_rgb(customization.get('title_bg_color', '#44546A'))
     line.width = Pt(1)
     font = title_shape.text_frame.paragraphs[0].font
     font.name = heading_font
     font.size = Pt(28)
-    font.color.rgb = hex_to_rgb(customization.get('title_font_color', '#FFFFFF')) if customization else DEFAULT_TEXT_COLOR
-    position = customization.get('title_position', 'left') if customization else 'left'
-    title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER if position == 'center' else PP_ALIGN.LEFT
+    font.color.rgb = hex_to_rgb(customization.get('title_font_color', '#FFFFFF'))
+    
+    position = customization.get('title_position', 'left')
+    if position == 'center':
+        title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.CENTER
+    else:
+        title_shape.text_frame.paragraphs[0].alignment = PP_ALIGN.LEFT
+
     tf = title_shape.text_frame
     tf.margin_left = Inches(0.2)
     tf.margin_right = Inches(0.2)
@@ -73,23 +85,34 @@ def truncate_text_if_needed(text, max_length):
     return text[:max_length-3] + "..."
 
 class GeneralPresentation:
-    def __init__(self, data, search_phrase="Business Analysis"):
+    def __init__(self, data, search_phrase="Business Analysis", customization=None):
         if not data:
             raise ValueError("Input data is empty.")
+            
+        print(f"DEBUG: GeneralPresentation init - data type: {type(data)}")
+        print(f"DEBUG: GeneralPresentation init - data content: {data}")
+        
+        # Ensure data is parsed if it's a JSON string
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+                print(f"DEBUG: GeneralPresentation init - parsed JSON: {data}")
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: GeneralPresentation init - JSON parsing error: {str(e)}")
+                raise ValueError("Input data is not valid JSON.")
+        
         self.data = data
         self.search_phrase = search_phrase
+        self.customization = customization or {}
         self.prs = Presentation()
         self.prs.slide_width = Inches(16)
         self.prs.slide_height = Inches(9)
         self.MAX_ROWS_PER_TABLE = 10
         
-        # Default customization values
-        self.slide_bg_color = SLIDE_BACKGROUND_COLOR
-        self.body_text_color = DEFAULT_TEXT_COLOR
-        self.title_bg_color = TABLE_HEADER_BG_COLOR
-        self.title_font_color = DEFAULT_TEXT_COLOR
-        self.font_size = Pt(16)
-        self.title_position = 'left'
+        # Apply customizations or use defaults
+        self.slide_bg_color = hex_to_rgb(self.customization.get('slide_bg_color', '#0F1632'))
+        self.body_text_color = hex_to_rgb(self.customization.get('body_text_color', '#FFFFFF'))
+        self.font_size = Pt(self.customization.get('font_size', 16))
         
         # Set background for all layouts
         for layout in self.prs.slide_layouts:
@@ -110,9 +133,9 @@ class GeneralPresentation:
             font.bold = True
             font.color.rgb = TABLE_HEADER_FONT_COLOR
             cell.fill.solid()
-            cell.fill.fore_color.rgb = TABLE_HEADER_BG_COLOR
+            cell.fill.fore_color.rgb = hex_to_rgb(self.customization.get('title_bg_color', '#44546A'))
         else:
-            font.color.rgb = DEFAULT_TEXT_COLOR
+            font.color.rgb = self.body_text_color
             if is_dark_row:
                 cell.fill.solid()
                 cell.fill.fore_color.rgb = ROW_COLOR_DARK
@@ -259,7 +282,7 @@ class GeneralPresentation:
         subtitle_shape = slide.placeholders[1]
         subtitle_shape.text_frame.paragraphs[0].font.name = text_font
         subtitle_shape.text_frame.paragraphs[0].font.size = Pt(24)
-        subtitle_shape.text_frame.paragraphs[0].font.color.rgb = DEFAULT_TEXT_COLOR
+        subtitle_shape.text_frame.paragraphs[0].font.color.rgb = self.body_text_color
 
     def add_content_slide(self, slide_data):
         """Add a content slide with text, charts, and tables"""
@@ -268,7 +291,7 @@ class GeneralPresentation:
         # Set title
         title = slide_data.get('title', 'Content Slide')
         slide.shapes.title.text = title
-        set_title_style(slide.shapes.title, self.prs.slide_width)
+        set_title_style(slide.shapes.title, self.prs.slide_width, self.customization)
         
         # Add main content text
         content = slide_data.get('content', '')
@@ -295,7 +318,7 @@ class GeneralPresentation:
                 p.text = headline
                 p.font.name = key_font
                 p.font.size = Pt(20)
-                p.font.color.rgb = DEFAULT_TEXT_COLOR
+                p.font.color.rgb = self.body_text_color
                 p.font.bold = True
                 
                 # Add content as new paragraph
@@ -303,14 +326,14 @@ class GeneralPresentation:
                     p2 = tf.add_paragraph()
                     p2.text = f"\n{content}"
                     p2.font.name = text_font
-                    p2.font.size = Pt(16)
-                    p2.font.color.rgb = DEFAULT_TEXT_COLOR
+                    p2.font.size = self.font_size
+                    p2.font.color.rgb = self.body_text_color
             else:
                 p = tf.paragraphs[0]
                 p.text = content
                 p.font.name = text_font
-                p.font.size = Pt(16)
-                p.font.color.rgb = DEFAULT_TEXT_COLOR
+                p.font.size = self.font_size
+                p.font.color.rgb = self.body_text_color
         
         # Add chart if data is available
         chart_data = slide_data.get('chartData')
@@ -344,7 +367,7 @@ class GeneralPresentation:
         """Add a summary/conclusion slide"""
         slide = self.prs.slides.add_slide(self.prs.slide_layouts[1])
         slide.shapes.title.text = 'Key Takeaways & Next Steps'
-        set_title_style(slide.shapes.title, self.prs.slide_width)
+        set_title_style(slide.shapes.title, self.prs.slide_width, self.customization)
         
         # Get slides data to create summary
         slides = self.data.get('slides', [])
@@ -363,7 +386,7 @@ class GeneralPresentation:
         p.text = "Summary of Key Findings:"
         p.font.name = key_font
         p.font.size = Pt(20)
-        p.font.color.rgb = DEFAULT_TEXT_COLOR
+        p.font.color.rgb = self.body_text_color
         p.font.bold = True
         
         # Add key points from slides
@@ -372,15 +395,15 @@ class GeneralPresentation:
             title = slide_data.get('title', f'Point {i+1}')
             p_bullet.text = f"• {title}: Strategic importance for business growth"
             p_bullet.font.name = text_font
-            p_bullet.font.size = Pt(16)
-            p_bullet.font.color.rgb = DEFAULT_TEXT_COLOR
+            p_bullet.font.size = self.font_size
+            p_bullet.font.color.rgb = self.body_text_color
         
         # Next steps
         p_next = tf.add_paragraph()
         p_next.text = "\nRecommended Next Steps:"
         p_next.font.name = key_font
         p_next.font.size = Pt(18)
-        p_next.font.color.rgb = DEFAULT_TEXT_COLOR
+        p_next.font.color.rgb = self.body_text_color
         p_next.font.bold = True
         
         next_steps = [
@@ -394,29 +417,25 @@ class GeneralPresentation:
             p_step = tf.add_paragraph()
             p_step.text = f"• {step}"
             p_step.font.name = text_font
-            p_step.font.size = Pt(16)
-            p_step.font.color.rgb = DEFAULT_TEXT_COLOR
+            p_step.font.size = self.font_size
+            p_step.font.color.rgb = self.body_text_color
 
 def create_general_presentation(data, search_phrase="Business Analysis", customization=None):
     """Main function to create a general business presentation"""
     try:
+        print(f"DEBUG: Input data type: {type(data)}")
+        print(f"DEBUG: Input data content: {data}")
+        
         # Ensure data is parsed if it's a JSON string
         if isinstance(data, str):
             try:
                 data = json.loads(data)
-            except json.JSONDecodeError:
+                print(f"DEBUG: Parsed JSON data: {data}")
+            except json.JSONDecodeError as e:
+                print(f"DEBUG: JSON parsing error: {str(e)}")
                 raise ValueError("Input data is not valid JSON.")
-        
-        presentation = GeneralPresentation(data, search_phrase)
-        
-        # Apply customization settings
-        if customization:
-            presentation.slide_bg_color = hex_to_rgb(customization.get('slide_bg_color', '#0F1632'))
-            presentation.body_text_color = hex_to_rgb(customization.get('body_text_color', '#FFFFFF'))
-            presentation.title_bg_color = hex_to_rgb(customization.get('title_bg_color', '#44546A'))
-            presentation.title_font_color = hex_to_rgb(customization.get('title_font_color', '#FFFFFF'))
-            presentation.font_size = Pt(customization.get('font_size', 16))
-            presentation.title_position = customization.get('title_position', 'left')
+
+        presentation = GeneralPresentation(data, search_phrase, customization)
         
         # Add title slide
         presentation.add_title_slide()
@@ -430,14 +449,14 @@ def create_general_presentation(data, search_phrase="Business Analysis", customi
         if len(slides) > 1:
             presentation.add_summary_slide()
 
-        # Force all text to be white
-        for slide in presentation.prs.slides:
-            for shape in slide.shapes:
-                if not shape.has_text_frame:
-                    continue
-                for paragraph in shape.text_frame.paragraphs:
-                    for run in paragraph.runs:
-                        run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
+        # The explicit color override is no longer needed as it's handled by customization
+        # for slide in presentation.prs.slides:
+        #     for shape in slide.shapes:
+        #         if not shape.has_text_frame:
+        #             continue
+        #         for paragraph in shape.text_frame.paragraphs:
+        #             for run in paragraph.runs:
+        #                 run.font.color.rgb = RGBColor(0xFF, 0xFF, 0xFF)
         
         return presentation.prs
         
